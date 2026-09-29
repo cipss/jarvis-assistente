@@ -1,0 +1,17 @@
+# Build artifacts
+.build/
+build/
+*.o
+*.dSYM
+
+# macOS
+.DS_Store
+
+# Xcode / SwiftPM local state
+.swiftpm/
+xcuserdata/
+DerivedData/
+
+# Local env / secrets (never commit keys — the app stores them in Keychain)
+.env
+*.key
