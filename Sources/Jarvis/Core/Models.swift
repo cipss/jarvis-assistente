@@ -115,6 +115,18 @@ struct ConversationTurn: Codable, Hashable, Sendable {
 
 // MARK: - Settings
 
+enum BrainMode: String, Codable, Sendable, CaseIterable, Hashable {
+    case fastest
+    case geminiOnly
+
+    var displayName: String {
+        switch self {
+        case .fastest: "Automatico · più veloce"
+        case .geminiOnly: "Solo Gemini"
+        }
+    }
+}
+
 struct Hotkey: Codable, Hashable, Sendable {
     var keyCode: UInt32
     var modifiers: UInt32   // Carbon modifier mask (cmdKey | shiftKey | optionKey | controlKey)
@@ -143,6 +155,10 @@ struct Settings: Codable, Sendable {
     var codingModel: String = "claude-opus-5-5"
     /// Primary Gemini model used as Jarvis brain/orchestrator.
     var geminiModel: String = "gemini-3.5-flash-lite"
+    /// Automatico races multiple enabled providers and keeps the fastest healthy one.
+    var brainMode: BrainMode = .fastest
+    /// Maximum simultaneous LLM providers in the fast lane.
+    var maxParallelBrains: Int = 3
     /// When a session built something to look at (an HTML page, a site on localhost), open it at the end.
     var openResults: Bool = true
     var muteDuringFocus: Bool = true
@@ -190,6 +206,8 @@ struct Settings: Codable, Sendable {
         geminiModel = (savedGeminiModel == nil || savedGeminiModel == "gemini-3.8-flash" || savedGeminiModel == "gemini-3.7-flash" || savedGeminiModel == "gemini-3.6-flash")
             ? d.geminiModel
             : savedGeminiModel!
+        brainMode = try c.decodeIfPresent(BrainMode.self, forKey: .brainMode) ?? d.brainMode
+        maxParallelBrains = min(4, max(1, try c.decodeIfPresent(Int.self, forKey: .maxParallelBrains) ?? d.maxParallelBrains))
         openResults = try c.decodeIfPresent(Bool.self, forKey: .openResults) ?? d.openResults
         muteDuringFocus = try c.decodeIfPresent(Bool.self, forKey: .muteDuringFocus) ?? d.muteDuringFocus
         blipOnChordDown = try c.decodeIfPresent(Bool.self, forKey: .blipOnChordDown) ?? d.blipOnChordDown

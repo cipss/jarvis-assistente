@@ -3,7 +3,8 @@ import Foundation
 /// Gemini is Jarvis's primary reasoning/orchestration brain.
 /// Claude Code and Codex remain execution agents.
 struct Orchestrator: Sendable {
-    let gemini: GeminiAPI
+    let gemini: GeminiAPI?
+    let brain: FastBrainRouter
     var language: String = "Italian"
 
     static func languageRule(_ language: String) -> String {
@@ -26,10 +27,11 @@ struct Orchestrator: Sendable {
     - clarify: the one short clarification question.
 
     The architecture is:
-    - Gemini = reasoning/orchestration brain.
-    - Claude Code = execution agent.
-    - Codex = execution agent.
-    Gemini decides what should happen; it does not replace the execution agents.
+    - One AI brain/router coordinates Gemini, Groq, Cerebras and Claude API.
+    - Gemini remains the preferred reasoning model and conversation anchor when available.
+    - Groq and Cerebras provide an ultra-fast lane; Claude API is a quality lane for more complex requests.
+    - Claude Code and Codex are execution agents for real work.
+    All brain providers receive the same compact context. The fastest valid provider wins. Never mention the internal race to the user.
 
     Actions:
     - spawn: start a new execution session.
@@ -117,6 +119,7 @@ struct Orchestrator: Sendable {
     struct DecisionResult: Sendable {
         let action: OrchestratorAction?
         let interactionID: String?
+        let provider: FastBrainRouter.Provider?
     }
 
     func decide(
@@ -128,8 +131,7 @@ struct Orchestrator: Sendable {
         context: String?,
         memories: String = "- (nothing saved yet)",
         history: String = "- (none)",
-        previousInteractionID: String? = nil,
-        onSpeakReady: (@MainActor @Sendable (String) -> Void)? = nil
+        previousInteractionID: String? = nil
     ) async -> DecisionResult {
         let prompt = Self.userPrompt(
             projects: projects,
@@ -143,21 +145,16 @@ struct Orchestrator: Sendable {
         )
 
         do {
-            let result = try await gemini.generateJSON(
+            let result = try await brain.generateJSON(
                 systemInstruction: Self.systemPrompt + Self.languageRule(language),
                 prompt: prompt,
                 schema: Self.jsonSchema(),
-                previousInteractionID: previousInteractionID,
-                onSpeakReady: onSpeakReady.map { callback in
-                    { text in
-                        Task { @MainActor in callback(text) }
-                    }
-                }
+                previousGeminiInteractionID: previousInteractionID
             )
             if let action = try? JSONDecoder().decode(OrchestratorAction.self, from: result.jsonData) {
-                return DecisionResult(action: action, interactionID: result.interactionID)
+                return DecisionResult(action: action, interactionID: result.interactionID, provider: result.provider)
             }
-            AppLog.write("gemini orchestrator returned JSON that did not match the schema")
+            AppLog.write("brain router returned JSON that did not match the schema")
         } catch {
             AppLog.write("gemini orchestrator error: \(error.localizedDescription)")
             let detail: String
@@ -173,9 +170,10 @@ struct Orchestrator: Sendable {
                     project: nil,
                     sessionID: nil,
                     task: nil,
-                    speak: "Gemini non ha risposto: \(detail)"
+                    speak: "Nessun provider AI ha risposto: \(detail)"
                 ),
-                interactionID: nil
+                interactionID: nil,
+                provider: nil
             )
         }
 
@@ -188,7 +186,8 @@ struct Orchestrator: Sendable {
                 task: nil,
                 speak: "Gemini ha restituito una risposta che non riesco a interpretare."
             ),
-            interactionID: nil
+            interactionID: nil,
+            provider: nil
         )
     }
 
@@ -225,7 +224,8 @@ struct Orchestrator: Sendable {
         Do not invent details.
         """
 
-        if let result = try? await gemini.generateJSON(
+        if let gemini,
+           let result = try? await gemini.generateJSON(
             systemInstruction: system,
             prompt: prompt,
             schema: schema

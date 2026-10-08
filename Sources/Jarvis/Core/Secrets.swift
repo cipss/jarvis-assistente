@@ -9,6 +9,9 @@ import Security
 enum Secrets {
     static let fishKey = "fish-audio-api-key"
     static let geminiKey = "gemini-api-key"
+    static let groqKey = "groq-api-key"
+    static let cerebrasKey = "cerebras-api-key"
+    static let anthropicKey = "anthropic-api-key"
 
     private static let lock = NSLock()
     nonisolated(unsafe) private static var cache: [String: String?] = [:]
