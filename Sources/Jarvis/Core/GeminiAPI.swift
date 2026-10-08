@@ -238,6 +238,7 @@ struct GeminiAPI: Sendable {
             "model": model,
             "input": prompt,
             "system_instruction": systemInstruction,
+            "generation_config": ["thinking_level": "low", "thinking_summaries": "none"],
             "response_format": [
                 "type": "text",
                 "mime_type": "text/plain"
