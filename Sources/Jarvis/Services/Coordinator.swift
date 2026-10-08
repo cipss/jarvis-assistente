@@ -373,6 +373,8 @@ final class Coordinator {
                 guard !clean.isEmpty else { return }
                 self.earlySpokenGeneration = gen
                 self.earlySpokenText = text
+                self.conversationUntil = Date().addingTimeInterval(60)
+                self.hideTask?.cancel()
                 self.say(text)
             }
         )
