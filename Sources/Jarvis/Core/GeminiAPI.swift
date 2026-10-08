@@ -83,4 +83,31 @@ struct GeminiAPI: Sendable {
 
         return json
     }
+
+    func testConnection() async throws -> String {
+        guard !apiKey.isEmpty else { throw GeminiError.missingKey }
+        guard let url = URL(string: "https://generativelanguage.googleapis.com/v1beta/models/\(model)") else {
+            throw GeminiError.invalidResponse
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.timeoutInterval = 20
+        request.setValue(apiKey, forHTTPHeaderField: "x-goog-api-key")
+
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let http = response as? HTTPURLResponse else { throw GeminiError.invalidResponse }
+            guard (200..<300).contains(http.statusCode) else {
+                let body = String(data: data, encoding: .utf8) ?? "(nessun dettaglio)"
+                throw GeminiError.http(http.statusCode, "\(model): " + String(body.prefix(1500)))
+            }
+            return model
+        } catch let error as GeminiError {
+            throw error
+        } catch {
+            throw GeminiError.http(-1, error.localizedDescription)
+        }
+    }
+
 }
