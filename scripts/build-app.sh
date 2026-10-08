@@ -3,13 +3,21 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 CONF=${1:-release}
-swift build -c "$CONF" 2>&1 | grep -Ev "^\s*$" | tail -5
+
+echo "== Jarvis build ($CONF) =="
+
+# The build is intentionally run without grep/tail so the real compiler diagnostic is never hidden.
+# Swift 6 diagnostics can fail the frontend; we need the complete error and source location.
+swift build -c "$CONF"
+
 BIN=$(swift build -c "$CONF" --show-bin-path)
 APP="build/Jarvis.app"
-rm -rf "$APP"; mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+rm -rf "$APP"
+mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN/Jarvis" "$APP/Contents/MacOS/Jarvis"
 cp Sources/Jarvis/Info.plist "$APP/Contents/Info.plist"
 echo "APPL????" > "$APP/Contents/PkgInfo"
+
 # Sign with the self-signed "Jarvis Build Signing" so TCC grants (mic/speech) survive rebuilds: ad-hoc signatures
 # change with every build and macOS forgets the permissions each time. The identity lives in its own keychain,
 # ~/Library/Keychains/jarvis-signing.keychain-db, whose password sits in the Jarvis secrets folder: codesign never
