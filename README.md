@@ -1,6 +1,6 @@
 # Jarvis, assistente personale
 
-Jarvis è un assistente vocale per Mac con **Gemini come cervello principale** e [Claude Code](https://claude.com/claude-code) / [Codex](https://github.com/openai/codex) come agenti esecutori. Lo chiami per nome o batti due volte le mani, gli dici cosa ti serve e lui apre una sessione di Claude Code in background. Mentre lavora ti aggiorna a voce. Quando ha finito ti dice cosa ha fatto e ti apre il risultato.
+Jarvis è un assistente vocale per Mac con **Gemini come cervello principale** e [Claude Code](https://claude.com/claude-code) / [Codex](https://github.com/openai/codex) come agenti esecutori. Lo chiami per nome o batti due volte le mani, gli dici cosa ti serve e lui apre una sessione dell'agente scelto (Claude Code o Codex) in background. Mentre lavora ti aggiorna a voce. Quando ha finito ti dice cosa ha fatto e ti apre il risultato.
 
 Parla italiano, con la voce di [Fish Audio](https://fish.audio).
 
@@ -19,7 +19,8 @@ Parla italiano, con la voce di [Fish Audio](https://fish.audio).
 
 - Un Mac con **macOS 15** o successivo (con macOS 26 il pannello usa l'effetto vetro).
 - **Xcode 26**, oppure i Command Line Tools con Swift 6, per compilare l'app.
-- **Claude Code** installato e con il login fatto: Jarvis usa il tuo abbonamento. [Codex](https://github.com/openai/codex) è facoltativo.
+- **Una chiave Gemini API**, configurabile in Impostazioni › Agenti. Il modello predefinito è `gemini-3.8-flash`.
+- **Claude Code** e/o [Codex](https://github.com/openai/codex) per eseguire le attività operative.
 - Una **chiave API di Fish Audio** per la voce. È facoltativa: senza chiave Jarvis usa la voce di macOS.
 - La **dettatura in italiano scaricata sul Mac**: Impostazioni di Sistema › Tastiera › Dettatura. Serve per riconoscere il nome senza mandare audio a nessun server.
 
@@ -57,7 +58,7 @@ Esc annulla quello che stai dicendo. ⇧⌘O mostra o nasconde il pannello delle
 - Il microfono resta acceso per sentire il nome, ma **il riconoscimento avviene sul Mac**: l'audio non va a nessun server. Nei log finisce solo il comando, mai quello che si dice nella stanza.
 - Il testo delle richieste va a Gemini per l'orchestrazione. Le attività operative vengono poi passate a Claude Code o Codex. Le risposte da leggere a voce vanno a Fish Audio.
 - La chiave di Fish Audio sta in `~/Library/Application Support/Jarvis/secrets/`, leggibile solo dal tuo utente. Nel codice non ci sono chiavi.
-- La chiave Gemini viene salvata localmente nella cartella privata di Jarvis. Le chiavi `ANTHROPIC_API_KEY` e `OPENAI_API_KEY` non vengono inoltrate dal processo di orchestrazione.
+- La chiave Gemini viene salvata localmente nella cartella privata di Jarvis con permessi 0600. Le chiavi `ANTHROPIC_API_KEY` e `OPENAI_API_KEY` non vengono inoltrate dal processo di orchestrazione.
 
 ## Crediti
 
