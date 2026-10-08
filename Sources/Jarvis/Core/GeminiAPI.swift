@@ -47,8 +47,8 @@ struct GeminiAPI: Sendable {
     private static let session: URLSession = {
         let configuration = URLSessionConfiguration.default
         configuration.waitsForConnectivity = false
-        configuration.timeoutIntervalForRequest = 20
-        configuration.timeoutIntervalForResource = 45
+        configuration.timeoutIntervalForRequest = 12
+        configuration.timeoutIntervalForResource = 20
         configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
         configuration.httpMaximumConnectionsPerHost = 4
         return URLSession(configuration: configuration)
@@ -56,9 +56,13 @@ struct GeminiAPI: Sendable {
 
     /// Primary model first, followed by stable fallback models.
     private var candidateModels: [String] {
-        let models = [model, "gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash"]
+        let models = [model, "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"]
         var seen = Set<String>()
         return models.filter { seen.insert($0).inserted }
+    }
+
+    private static func thinkingLevel(for model: String) -> String {
+        (model == "gemini-3.5-flash-lite" || model == "gemini-3.1-flash-lite") ? "minimal" : "low"
     }
 
     func generateJSON(
@@ -115,7 +119,11 @@ struct GeminiAPI: Sendable {
             "model": model,
             "input": prompt,
             "system_instruction": systemInstruction,
-            "generation_config": ["thinking_level": "low", "thinking_summaries": "none"]
+            "generation_config": [
+                "thinking_level": Self.thinkingLevel(for: model),
+                "thinking_summaries": "none",
+                "max_output_tokens": 384
+            ]
         ]
 
         if let previousInteractionID {
@@ -142,7 +150,7 @@ struct GeminiAPI: Sendable {
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        request.timeoutInterval = 20
+        request.timeoutInterval = 12
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(apiKey, forHTTPHeaderField: "x-goog-api-key")
         request.httpBody = data
