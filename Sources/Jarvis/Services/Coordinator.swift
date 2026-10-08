@@ -305,17 +305,22 @@ final class Coordinator {
             showError("Gemini API non è configurata. Inserisci la chiave nelle Impostazioni → Agenti.")
             return
         }
-        let previous = orchestratorTurn
+
+        // The newest utterance always wins. Do not queue a stale Gemini request behind the previous one.
+        orchestratorTurn?.cancel()
+        turnGeneration += 1
+        let gen = turnGeneration
+
         let turn = Task { @MainActor in
-            await previous?.value
-            await self.handleSerialized(transcript: transcript, geminiKey: key)
+            guard !Task.isCancelled else { return }
+            await self.handleSerialized(transcript: transcript, geminiKey: key, generation: gen)
         }
         orchestratorTurn = turn
         await turn.value
     }
 
-    private func handleSerialized(transcript: String, geminiKey: String) async {
-        let gen = turnGeneration
+    private func handleSerialized(transcript: String, geminiKey: String, generation: Int) async {
+        let gen = generation
         let model = settings.settings.geminiModel
 
         if geminiConversationModel != model {
@@ -341,7 +346,7 @@ final class Coordinator {
             previousInteractionID: previousInteractionID
         )
 
-        guard gen == turnGeneration else {
+        guard !Task.isCancelled, gen == turnGeneration else {
             AppLog.write("turn dropped (escaped): \(transcript)")
             return
         }
