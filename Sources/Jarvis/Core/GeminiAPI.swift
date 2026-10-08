@@ -43,6 +43,17 @@ struct GeminiAPI: Sendable {
         }
     }
 
+    /// One long-lived URLSession keeps the HTTPS connection warm between turns.
+    private static let session: URLSession = {
+        let configuration = URLSessionConfiguration.default
+        configuration.waitsForConnectivity = false
+        configuration.timeoutIntervalForRequest = 20
+        configuration.timeoutIntervalForResource = 45
+        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+        configuration.httpMaximumConnectionsPerHost = 4
+        return URLSession(configuration: configuration)
+    }()
+
     /// Primary model first, followed by stable fallback models.
     private var candidateModels: [String] {
         let models = [model, "gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash"]
@@ -76,7 +87,7 @@ struct GeminiAPI: Sendable {
                     } ?? false
                     guard retryable && attempt == 0 else { break }
                     AppLog.write("gemini retry model=\(candidate) after \(error.localizedDescription)")
-                    try? await Task.sleep(for: .milliseconds(900))
+                    try? await Task.sleep(for: .milliseconds(300))
                 }
             }
 
@@ -131,12 +142,12 @@ struct GeminiAPI: Sendable {
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        request.timeoutInterval = 60
+        request.timeoutInterval = 20
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(apiKey, forHTTPHeaderField: "x-goog-api-key")
         request.httpBody = data
 
-        let (responseData, response) = try await URLSession.shared.data(for: request)
+        let (responseData, response) = try await Self.session.data(for: request)
         guard let http = response as? HTTPURLResponse else {
             throw GeminiError.invalidResponse
         }
@@ -254,7 +265,7 @@ struct GeminiAPI: Sendable {
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        request.timeoutInterval = 30
+        request.timeoutInterval = 12
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(apiKey, forHTTPHeaderField: "x-goog-api-key")
         request.httpBody = data
