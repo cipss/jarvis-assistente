@@ -76,8 +76,6 @@ final class Coordinator {
         clarifyContext = nil
         geminiInteractionID = nil
         conversationUntil = nil
-        earlySpokenGeneration = -1
-        earlySpokenText = ""
         AppLog.write("history cleared")
     }
     var onOverlayToggle: (() -> Void)?
