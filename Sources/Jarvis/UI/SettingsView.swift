@@ -8,6 +8,7 @@ struct SettingsView: View {
     var body: some View {
         TabView {
             GeneralTab(coordinator: coordinator).tabItem { Label("Generale", systemImage: "slider.horizontal.3") }
+            GeminiTab(coordinator: coordinator).tabItem { Label("Gemini", systemImage: "sparkles") }
             AgentsTab(coordinator: coordinator).tabItem { Label("Agenti", systemImage: "terminal") }
             VoiceTab(coordinator: coordinator).tabItem { Label("Voce", systemImage: "waveform") }
             ProjectsTab(registry: coordinator.registry, settings: coordinator.settings).tabItem { Label("Progetti", systemImage: "folder") }
@@ -68,56 +69,131 @@ struct GeneralTab: View {
     }
 }
 
-struct AgentsTab: View {
+struct GeminiTab: View {
     @Bindable var coordinator: Coordinator
-    @State private var claudeVersion = "…"
-    @State private var codexVersion = "…"
-    @State private var geminiKeyField = ""
-    @State private var hasGeminiKey = Secrets.get(Secrets.geminiKey) != nil
-    @State private var geminiStatus = ""
+    @State private var keyField = ""
+    @State private var hasKey = Secrets.get(Secrets.geminiKey) != nil
+    @State private var status = ""
 
     var body: some View {
         @Bindable var s = coordinator.settings
         Form {
-            Section("Cervello di Jarvis") {
-                LabeledContent("Gemini API") {
-                    Text(hasGeminiKey ? "Configurata" : "Non configurata")
-                        .foregroundStyle(hasGeminiKey ? .primary : .secondary)
+            Section {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 10) {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 22, weight: .semibold))
+                            .foregroundStyle(.blue)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Gemini")
+                                .font(.title3.weight(.semibold))
+                            Text("Cervello principale di Jarvis")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Circle()
+                            .fill(hasKey ? .green : .red)
+                            .frame(width: 9, height: 9)
+                        Text(hasKey ? "Configurata" : "Da configurare")
+                            .font(.caption.weight(.medium))
+                    }
+                    Text("Gemini interpreta le richieste, decide cosa fare, gestisce routing, memoria, follow-up e riassunti. Claude Code e Codex rimangono gli esecutori.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
+                .padding(.vertical, 4)
+            }
+
+            Section("API Gemini") {
                 LabeledContent("Chiave API") {
                     HStack {
-                        SecureField("Incolla GEMINI_API_KEY", text: $geminiKeyField)
+                        SecureField("Incolla la chiave Gemini", text: $keyField)
                             .textFieldStyle(.roundedBorder)
-                        Button(hasGeminiKey ? "Sostituisci" : "Salva") { saveGeminiKey() }
-                            .disabled(geminiKeyField.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        Button(hasKey ? "Sostituisci" : "Salva") {
+                            saveKey()
+                        }
+                        .disabled(keyField.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     }
                 }
+
+                LabeledContent("Modello") {
+                    HStack {
+                        Image(systemName: "sparkles")
+                            .foregroundStyle(.blue)
+                        TextField("gemini-3.8-flash", text: $s.settings.geminiModel)
+                            .textFieldStyle(.roundedBorder)
+                    }
+                }
+
                 HStack {
-                    Text("Modello")
-                    TextField("gemini-3.8-flash", text: $s.settings.geminiModel)
-                        .textFieldStyle(.roundedBorder)
+                    Spacer()
                     Button("Rimuovi chiave") {
                         Secrets.delete(Secrets.geminiKey)
-                        hasGeminiKey = false
-                        geminiStatus = "Chiave rimossa."
+                        hasKey = false
+                        status = "Chiave Gemini rimossa."
                     }
-                    .disabled(!hasGeminiKey)
+                    .disabled(!hasKey)
                 }
-                Text("Gemini è il cervello principale: decide routing, memoria, follow-up e riassunti. Claude Code e Codex restano gli esecutori.")
-                    .font(.caption).foregroundStyle(.secondary)
-                if !geminiStatus.isEmpty {
-                    Text(geminiStatus).font(.caption).foregroundStyle(.secondary)
+
+                if !status.isEmpty {
+                    Text(status)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
             }
 
+            Section("Stato") {
+                LabeledContent("Cervello") {
+                    Label("Gemini", systemImage: "sparkles")
+                        .foregroundStyle(.blue)
+                }
+                LabeledContent("Esecutori") {
+                    Text("Claude Code · Codex")
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .formStyle(.grouped)
+    }
+
+    private func saveKey() {
+        let key = keyField.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !key.isEmpty else { return }
+        if Secrets.set(key, for: Secrets.geminiKey) {
+            hasKey = true
+            keyField = ""
+            status = "Chiave Gemini salvata localmente."
+        } else {
+            status = "Non riesco a salvare la chiave."
+        }
+    }
+}
+
+struct AgentsTab: View {
+    @Bindable var coordinator: Coordinator
+    @State private var claudeVersion = "…"
+    @State private var codexVersion = "…"
+
+    var body: some View {
+        @Bindable var s = coordinator.settings
+        Form {
             Section("Esecutori disponibili") {
                 LabeledContent("Claude Code") {
-                    Text(coordinator.claudePath.map { "\($0)  ·  \(claudeVersion)" } ?? "non trovato")
-                        .font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
+                    HStack {
+                        Image(systemName: "hammer")
+                            .foregroundStyle(.secondary)
+                        Text(coordinator.claudePath.map { "\($0)  ·  \(claudeVersion)" } ?? "non trovato")
+                            .font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
+                    }
                 }
                 LabeledContent("Codex") {
-                    Text(coordinator.codexPath.map { "\($0)  ·  \(codexVersion)" } ?? "non trovato")
-                        .font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
+                    HStack {
+                        Image(systemName: "terminal")
+                            .foregroundStyle(.secondary)
+                        Text(coordinator.codexPath.map { "\($0)  ·  \(codexVersion)" } ?? "non trovato")
+                            .font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
+                    }
                 }
             }
 
@@ -138,18 +214,6 @@ struct AgentsTab: View {
         .task {
             if let p = coordinator.claudePath { claudeVersion = await CLILocator.version(of: p) ?? "?" }
             if let p = coordinator.codexPath { codexVersion = await CLILocator.version(of: p) ?? "?" }
-        }
-    }
-
-    private func saveGeminiKey() {
-        let key = geminiKeyField.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !key.isEmpty else { return }
-        if Secrets.set(key, for: Secrets.geminiKey) {
-            hasGeminiKey = true
-            geminiKeyField = ""
-            geminiStatus = "Chiave Gemini salvata localmente."
-        } else {
-            geminiStatus = "Non riesco a salvare la chiave."
         }
     }
 }
