@@ -58,7 +58,7 @@ struct Orchestrator: Sendable {
             "additionalProperties": false,
             "properties": [
                 "action": ["type": "string", "enum": ["spawn","followup","cancel","status","open","clarify","chitchat","create"]],
-                "agent": ["type": ["string","null"], "enum": ["claude","codex", NSNull()]],
+                "agent": ["type": ["string","null"], "enum": ["claude","codex"]],
                 "project": ["type": ["string","null"]],
                 "session_id": ["type": ["string","null"]],
                 "task": ["type": ["string","null"]],
@@ -130,8 +130,7 @@ struct Orchestrator: Sendable {
             let json = try await gemini.generateJSON(
                 systemInstruction: Self.systemPrompt + Self.languageRule(language),
                 prompt: prompt,
-                schema: Self.jsonSchema(),
-                temperature: 0.1
+                schema: Self.jsonSchema()
             )
             let data = try JSONSerialization.data(withJSONObject: json)
             if let action = try? JSONDecoder().decode(OrchestratorAction.self, from: data) {
@@ -196,8 +195,7 @@ struct Orchestrator: Sendable {
         if let json = try? await gemini.generateJSON(
             systemInstruction: system,
             prompt: prompt,
-            schema: schema,
-            temperature: 0.2
+            schema: schema
         ), let speak = json["speak"] as? String, !speak.isEmpty {
             return speak
         }
