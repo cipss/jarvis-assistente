@@ -316,28 +316,30 @@ final class Coordinator {
     var geminiConfigured: Bool { Secrets.get(Secrets.geminiKey) != nil }
 
     func handle(transcript: String) async {
-        guard geminiConfigured, let key = Secrets.get(Secrets.geminiKey) else {
-            showError("Gemini API non è configurata. Inserisci la chiave nelle Impostazioni → Agenti.")
+        let geminiKey = Secrets.get(Secrets.geminiKey)
+        let hasAnyBrain = [geminiKey, Secrets.get(Secrets.groqKey), Secrets.get(Secrets.cerebrasKey), Secrets.get(Secrets.anthropicKey)]
+            .contains { $0 != nil && !$0!.isEmpty }
+        guard hasAnyBrain else {
+            showError("Configura almeno una API AI nelle Impostazioni → Cervello.")
             return
         }
 
-        // The newest utterance always wins. Do not queue a stale Gemini request behind the previous one.
+        // The newest utterance always wins. Do not queue a stale request behind the previous one.
         orchestratorTurn?.cancel()
         turnGeneration += 1
         let gen = turnGeneration
 
         let turn = Task { @MainActor in
             guard !Task.isCancelled else { return }
-            await self.handleSerialized(transcript: transcript, geminiKey: key, generation: gen)
+            await self.handleSerialized(transcript: transcript, geminiKey: geminiKey, generation: gen)
         }
         orchestratorTurn = turn
         await turn.value
     }
 
-    private func handleSerialized(transcript: String, geminiKey: String, generation: Int) async {
+    private func handleSerialized(transcript: String, geminiKey: String?, generation: Int) async {
         let gen = generation
         let model = settings.settings.geminiModel
-
         if geminiConversationModel != model {
             geminiInteractionID = nil
             geminiConversationModel = model
@@ -347,7 +349,7 @@ final class Coordinator {
         let conversationHistory = previousInteractionID == nil
             ? memory.turnsSummary
             : "- Conversazione precedente mantenuta da Gemini sul server."
-        let gemini = GeminiAPI(apiKey: geminiKey, model: model)
+        let gemini = geminiKey.map { GeminiAPI(apiKey: $0, model: model) }
         let brain = FastBrainRouter(
             mode: settings.settings.brainMode,
             maxParallel: settings.settings.maxParallelBrains,
@@ -381,7 +383,7 @@ final class Coordinator {
             project: nil,
             sessionID: nil,
             task: nil,
-            speak: "Non ho ricevuto una decisione valida da Gemini."
+            speak: "Non ho ricevuto una decisione valida dal cervello AI."
         )
 
         if decision.provider == .gemini {
