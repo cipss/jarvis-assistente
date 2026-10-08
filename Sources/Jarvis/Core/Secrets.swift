@@ -8,6 +8,7 @@ import Security
 /// the item was added with the `security` CLI). Never in the code, never in settings.json, never in the logs.
 enum Secrets {
     static let fishKey = "fish-audio-api-key"
+    static let geminiKey = "gemini-api-key"
 
     private static let lock = NSLock()
     nonisolated(unsafe) private static var cache: [String: String?] = [:]
