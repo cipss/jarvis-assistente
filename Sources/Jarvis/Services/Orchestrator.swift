@@ -134,8 +134,7 @@ struct Orchestrator: Sendable {
         do {
             let json = try await gemini.generateJSON(
                 systemInstruction: Self.systemPrompt + Self.languageRule(language),
-                prompt: prompt,
-                schema: Self.jsonSchema()
+                prompt: prompt
             )
             let data = try JSONSerialization.data(withJSONObject: json)
             if let action = try? JSONDecoder().decode(OrchestratorAction.self, from: data) {
@@ -205,8 +204,7 @@ struct Orchestrator: Sendable {
 
         if let json = try? await gemini.generateJSON(
             systemInstruction: system,
-            prompt: prompt,
-            schema: schema
+            prompt: prompt
         ), let speak = json["speak"] as? String, !speak.isEmpty {
             return speak
         }
