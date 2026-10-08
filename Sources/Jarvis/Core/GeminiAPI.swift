@@ -36,7 +36,7 @@ struct GeminiAPI: Sendable {
         ]
 
         let body: [String: Any] = [
-            "system_instruction": [
+            "systemInstruction": [
                 "parts": [["text": systemInstruction]]
             ],
             "contents": [[
@@ -62,7 +62,7 @@ struct GeminiAPI: Sendable {
         guard let http = response as? HTTPURLResponse else { throw GeminiError.invalidResponse }
 
         guard (200..<300).contains(http.statusCode) else {
-            throw GeminiError.http(http.statusCode, String((String(data: responseData, encoding: .utf8) ?? "").prefix(1200)))
+            throw GeminiError.http(http.statusCode, "\(model): " + String((String(data: responseData, encoding: .utf8) ?? "").prefix(1200)))
         }
 
         guard
