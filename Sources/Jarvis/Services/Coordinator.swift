@@ -314,9 +314,17 @@ final class Coordinator {
 
     private func handleSerialized(transcript: String, geminiKey: String) async {
         let gen = turnGeneration
-        let gemini = GeminiAPI(apiKey: geminiKey, model: settings.settings.geminiModel)
+        let model = settings.settings.geminiModel
+
+        if geminiConversationModel != model {
+            geminiInteractionID = nil
+            geminiConversationModel = model
+        }
+
+        let previousInteractionID = geminiInteractionID
+        let gemini = GeminiAPI(apiKey: geminiKey, model: model)
         let orch = Orchestrator(gemini: gemini, language: settings.settings.replyLanguage)
-        let action = await orch.decide(
+        let decision = await orch.decide(
             transcript: transcript,
             projects: registry.promptSummary,
             sessions: sessions.promptSummary,
@@ -324,12 +332,28 @@ final class Coordinator {
             runningCount: sessions.running.count,
             context: clarifyContext,
             memories: memory.promptSummary,
-            history: memory.turnsSummary
+            history: memory.turnsSummary,
+            previousInteractionID: previousInteractionID
         )
+
         guard gen == turnGeneration else {
             AppLog.write("turn dropped (escaped): \(transcript)")
             return
         }
+
+        let action = decision.action ?? OrchestratorAction(
+            action: .chitchat,
+            agent: nil,
+            project: nil,
+            sessionID: nil,
+            task: nil,
+            speak: "Non ho ricevuto una decisione valida da Gemini."
+        )
+
+        if let newInteractionID = decision.interactionID {
+            geminiInteractionID = newInteractionID
+        }
+
         let priorContext = clarifyContext
         clarifyContext = nil
         AppLog.write("transcript=\"\(transcript)\" → \(action)")
