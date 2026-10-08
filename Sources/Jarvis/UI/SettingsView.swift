@@ -17,7 +17,7 @@ struct SettingsView: View {
     var body: some View {
         TabView(selection: $selectedTab) {
             GeneralTab(coordinator: coordinator).tabItem { Label("Generale", systemImage: "slider.horizontal.3") }.tag(SettingsTab.general)
-            GeminiTab(coordinator: coordinator).tabItem { Label("Gemini", systemImage: "sparkles") }.tag(SettingsTab.gemini)
+            GeminiTab(coordinator: coordinator).tabItem { Label("Cervello", systemImage: "sparkles") }.tag(SettingsTab.gemini)
             AgentsTab(coordinator: coordinator).tabItem { Label("Agenti", systemImage: "terminal") }.tag(SettingsTab.agents)
             VoiceTab(coordinator: coordinator).tabItem { Label("Voce", systemImage: "waveform") }.tag(SettingsTab.voice)
             ProjectsTab(registry: coordinator.registry, settings: coordinator.settings).tabItem { Label("Progetti", systemImage: "folder") }.tag(SettingsTab.projects)
@@ -86,6 +86,12 @@ struct GeminiTab: View {
     @Bindable var coordinator: Coordinator
     @State private var keyField = ""
     @State private var hasKey = Secrets.get(Secrets.geminiKey) != nil
+    @State private var groqField = ""
+    @State private var hasGroqKey = Secrets.get(Secrets.groqKey) != nil
+    @State private var cerebrasField = ""
+    @State private var hasCerebrasKey = Secrets.get(Secrets.cerebrasKey) != nil
+    @State private var anthropicField = ""
+    @State private var hasAnthropicKey = Secrets.get(Secrets.anthropicKey) != nil
     @State private var status = ""
 
     var body: some View {
@@ -166,6 +172,43 @@ struct GeminiTab: View {
                 }
             }
 
+            Section("Provider AI veloci") {
+                Text("In modalità automatica Jarvis invia la richiesta in parallelo ai provider disponibili e usa la prima risposta valida. Le API non si sostituiscono: condividono lo stesso contesto e vengono gestite da un unico router.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                ProviderKeyRow(
+                    title: "Groq",
+                    placeholder: "Chiave Groq",
+                    keyField: $groqField,
+                    hasKey: hasGroqKey,
+                    save: saveGroqKey,
+                    remove: removeGroqKey
+                )
+                ProviderKeyRow(
+                    title: "Cerebras",
+                    placeholder: "Chiave Cerebras",
+                    keyField: $cerebrasField,
+                    hasKey: hasCerebrasKey,
+                    save: saveCerebrasKey,
+                    remove: removeCerebrasKey
+                )
+                ProviderKeyRow(
+                    title: "Claude API",
+                    placeholder: "Chiave Anthropic",
+                    keyField: $anthropicField,
+                    hasKey: hasAnthropicKey,
+                    save: saveAnthropicKey,
+                    remove: removeAnthropicKey
+                )
+
+                Picker("Strategia", selection: $s.settings.brainMode) {
+                    ForEach(BrainMode.allCases, id: \.self) { Text($0.displayName).tag($0) }
+                }
+                Stepper("Provider simultanei: \(s.settings.maxParallelBrains)", value: $s.settings.maxParallelBrains, in: 1...4)
+                    .help("Quanti provider possono correre insieme nella corsia veloce.")
+            }
+
             Section("Stato") {
                 LabeledContent("Cervello") {
                     Label("Gemini", systemImage: "sparkles")
@@ -197,6 +240,36 @@ struct GeminiTab: View {
         }
     }
 
+    private func saveGroqKey() {
+        let key = groqField.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !key.isEmpty, Secrets.set(key, for: Secrets.groqKey) else { return }
+        hasGroqKey = true; groqField = ""
+    }
+
+    private func removeGroqKey() {
+        Secrets.delete(Secrets.groqKey); hasGroqKey = false
+    }
+
+    private func saveCerebrasKey() {
+        let key = cerebrasField.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !key.isEmpty, Secrets.set(key, for: Secrets.cerebrasKey) else { return }
+        hasCerebrasKey = true; cerebrasField = ""
+    }
+
+    private func removeCerebrasKey() {
+        Secrets.delete(Secrets.cerebrasKey); hasCerebrasKey = false
+    }
+
+    private func saveAnthropicKey() {
+        let key = anthropicField.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !key.isEmpty, Secrets.set(key, for: Secrets.anthropicKey) else { return }
+        hasAnthropicKey = true; anthropicField = ""
+    }
+
+    private func removeAnthropicKey() {
+        Secrets.delete(Secrets.anthropicKey); hasAnthropicKey = false
+    }
+
     private func saveKey() {
         let key = keyField.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !key.isEmpty else { return }
@@ -206,6 +279,29 @@ struct GeminiTab: View {
             status = "Chiave Gemini salvata localmente."
         } else {
             status = "Non riesco a salvare la chiave."
+        }
+    }
+}
+
+private struct ProviderKeyRow: View {
+    let title: String
+    let placeholder: String
+    @Binding var keyField: String
+    let hasKey: Bool
+    let save: () -> Void
+    let remove: () -> Void
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Text(title).frame(width: 90, alignment: .leading)
+            SecureField(hasKey ? "Configurata" : placeholder, text: $keyField)
+                .textFieldStyle(.roundedBorder)
+            Button(hasKey ? "Sostituisci" : "Salva") { save() }
+                .disabled(keyField.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            if hasKey {
+                Button("Rimuovi") { remove() }
+                    .buttonStyle(.borderless)
+            }
         }
     }
 }
