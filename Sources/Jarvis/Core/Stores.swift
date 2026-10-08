@@ -91,14 +91,14 @@ final class SessionStore {
         let recent = sessions.filter { !$0.dismissed }.prefix(4)
         guard !recent.isEmpty else { return "- (none)" }
         return recent.map { s in
-            var line = "- \(s.id) · \(s.projectName) · \(s.agent.rawValue) · \(s.status.rawValue) · "\(s.task.prefix(60))""
+            var line = "- \(s.id) · \(s.projectName) · \(s.agent.rawValue) · \(s.status.rawValue) · \"\(s.task.prefix(60))\""
             if s.status == .running, !s.activity.isEmpty {
                 line += " · now: \(s.activity.prefix(60))"
             }
             if let end = s.finishedAt {
                 line += " · finished \(Int(Date().timeIntervalSince(end) / 60))m ago"
                 let r = s.resultText.replacingOccurrences(of: "\n", with: " ").trimmingCharacters(in: .whitespaces)
-                if !r.isEmpty { line += " · result: "\(r.prefix(800))"" }
+                if !r.isEmpty { line += " · result: \"\(r.prefix(800))\"" }
             }
             return line
         }.joined(separator: "\n")
@@ -175,13 +175,14 @@ final class MemoryStore {
     }
 
     /// Recent exchanges, oldest first, for the orchestrator prompt.
+    /// Recent exchanges, oldest first, for the orchestrator prompt.
     var turnsSummary: String {
         guard !turns.isEmpty else { return "- (none)" }
         let f = RelativeDateTimeFormatter(); f.unitsStyle = .abbreviated
         return turns.suffix(6).map { t in
-            var line = "- [\(f.localizedString(for: t.at, relativeTo: Date()))] heard: "\(t.heard.prefix(180))" → \(t.action)"
-            if let p = t.project, !p.isEmpty { line += " project="\(p)"" }
-            if !t.said.isEmpty { line += " · said: "\(t.said.prefix(180))"" }
+            var line = "- [\(f.localizedString(for: t.at, relativeTo: Date()))] heard: \"\(t.heard.prefix(180))\" → \(t.action)"
+            if let p = t.project, !p.isEmpty { line += " project=\"\(p)\"" }
+            if !t.said.isEmpty { line += " · said: \"\(t.said.prefix(180))\"" }
             return line
         }.joined(separator: "\n")
     }
