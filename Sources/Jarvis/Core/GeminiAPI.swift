@@ -27,12 +27,8 @@ struct GeminiAPI: Sendable {
         guard !apiKey.isEmpty else { throw GeminiError.missingKey }
 
         let generationConfig: [String: Any] = [
-            "responseFormat": [
-                "text": [
-                    "mimeType": "application/json",
-                    "schema": schema
-                ]
-            ]
+            "responseMimeType": "application/json",
+            "responseSchema": schema
         ]
 
         let body: [String: Any] = [
