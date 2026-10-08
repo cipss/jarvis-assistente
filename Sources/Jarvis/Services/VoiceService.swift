@@ -20,9 +20,6 @@ final class VoiceService: NSObject, AVAudioPlayerDelegate, AVSpeechSynthesizerDe
     private var queue: [String] = []
     private var settings: SettingsStore
     private var currentTask: Task<Void, Never>?
-    /// Set once Fish answers 402 for the paid model; cleared on launch.
-    private var proUnavailable = false
-
     init(settings: SettingsStore) {
         self.settings = settings
         super.init()
@@ -87,7 +84,7 @@ final class VoiceService: NSObject, AVAudioPlayerDelegate, AVSpeechSynthesizerDe
                         data = try await FishAudio.synthesize(text: text, apiKey: key, voiceID: settings.settings.fishVoiceID, speed: settings.settings.speakingRate, model: model)
                     } catch let e as FishAudio.APIError where e.status == 402 && pref == "auto" && model != FishAudio.freeModel {
                         AppLog.write("fish: paid endpoint unavailable → using \(FishAudio.freeModel)")
-                        proUnavailable = true; model = FishAudio.freeModel
+                        model = FishAudio.freeModel
                         data = try await FishAudio.synthesize(text: text, apiKey: key, voiceID: settings.settings.fishVoiceID, speed: settings.settings.speakingRate, model: model)
                     }
                     guard !Task.isCancelled else { return }
