@@ -382,7 +382,7 @@ final class Coordinator {
         AppLog.write("transcript=\"\(transcript)\" → \(action)")
         await perform(action, transcript: priorContext.map { "\($0) / \(transcript)" } ?? transcript)
         // Re-arm the dialogue immediately. TTS still has priority; when it finishes refreshWake enters conversation mode.
-        conversationUntil = Date().addingTimeInterval(15)
+        conversationUntil = Date().addingTimeInterval(60)
         refreshWake()
     }
 
@@ -744,7 +744,17 @@ final class Coordinator {
 
     private func didFinishSpeaking() {
         defer { refreshWake() }
-        if pill.state == .clarify { dismissPill(after: 8) } else { dismissPill(after: 0.25) }
+        if let until = conversationUntil, until > Date() {
+            pill.state = .listening
+            pill.transcript = ""
+            pill.secondary = ""
+            pill.visible = true
+            pillDidChange()
+        } else if pill.state == .clarify {
+            dismissPill(after: 8)
+        } else {
+            dismissPill(after: 0.25)
+        }
     }
 
     private func showError(_ msg: String) {
