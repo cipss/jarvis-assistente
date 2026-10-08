@@ -4,7 +4,7 @@ import Foundation
 /// Enabled providers run concurrently; the first valid structured response wins.
 /// This keeps Gemini as the primary brain while allowing faster infrastructure to answer.
 struct FastBrainRouter: Sendable {
-    enum Provider: String, Sendable {
+    enum Provider: String, Sendable, Hashable {
         case gemini
         case groq
         case cerebras
