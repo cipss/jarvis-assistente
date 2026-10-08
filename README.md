@@ -1,6 +1,6 @@
 # Jarvis, assistente personale
 
-Jarvis è un assistente vocale per Mac che lavora con [Claude Code](https://claude.com/claude-code). Lo chiami per nome o batti due volte le mani, gli dici cosa ti serve e lui apre una sessione di Claude Code in background. Mentre lavora ti aggiorna a voce. Quando ha finito ti dice cosa ha fatto e ti apre il risultato.
+Jarvis è un assistente vocale per Mac con **Gemini come cervello principale** e [Claude Code](https://claude.com/claude-code) / [Codex](https://github.com/openai/codex) come agenti esecutori. Lo chiami per nome o batti due volte le mani, gli dici cosa ti serve e lui apre una sessione di Claude Code in background. Mentre lavora ti aggiorna a voce. Quando ha finito ti dice cosa ha fatto e ti apre il risultato.
 
 Parla italiano, con la voce di [Fish Audio](https://fish.audio).
 
@@ -8,7 +8,7 @@ Parla italiano, con la voce di [Fish Audio](https://fish.audio).
 
 - **Si attiva a voce o con le mani.** Dici «Jarvis» e poi la richiesta, oppure batti due volte le mani e parli. Risponde quando hai finito di parlare. In alternativa tieni premuto ⇧⌘Spazio, parli e rilasci.
 - **Puoi interromperlo.** Se gli parli sopra mentre sta parlando, si ferma e ti ascolta.
-- **Lavora in background.** Ogni richiesta diventa una sessione di Claude Code nella cartella del progetto giusto. Le richieste di codice usano Opus 5.5, il resto il modello predefinito.
+- **Lavora in background.** Gemini interpreta ogni richiesta, decide l'azione e l'agente. Le attività vengono poi eseguite da Claude Code o Codex nella cartella del progetto giusto.
 - **Ti aggiorna mentre lavora**, non solo alla fine: una frase breve ogni tanto su cosa sta facendo.
 - **Ti mostra le sessioni.** In alto a destra vedi le sessioni aperte, con lo stato di ognuna. «Pulisci» toglie quelle finite e azzera la conversazione.
 - **Apre il risultato.** Se una sessione ha costruito una pagina o un sito, Jarvis lo apre da solo.
@@ -55,9 +55,9 @@ Esc annulla quello che stai dicendo. ⇧⌘O mostra o nasconde il pannello delle
 ## Privacy
 
 - Il microfono resta acceso per sentire il nome, ma **il riconoscimento avviene sul Mac**: l'audio non va a nessun server. Nei log finisce solo il comando, mai quello che si dice nella stanza.
-- Il testo delle richieste va a Claude attraverso Claude Code. Le risposte da leggere a voce vanno a Fish Audio.
+- Il testo delle richieste va a Gemini per l'orchestrazione. Le attività operative vengono poi passate a Claude Code o Codex. Le risposte da leggere a voce vanno a Fish Audio.
 - La chiave di Fish Audio sta in `~/Library/Application Support/Jarvis/secrets/`, leggibile solo dal tuo utente. Nel codice non ci sono chiavi.
-- Le sessioni usano il tuo abbonamento Claude Code: le variabili `ANTHROPIC_API_KEY` e `OPENAI_API_KEY` vengono tolte dall'ambiente, così non paghi a consumo senza saperlo.
+- La chiave Gemini viene salvata localmente nella cartella privata di Jarvis. Le chiavi `ANTHROPIC_API_KEY` e `OPENAI_API_KEY` non vengono inoltrate dal processo di orchestrazione.
 
 ## Crediti
 
