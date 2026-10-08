@@ -196,17 +196,15 @@ final class WakeService {
             beginCapture(.name, initial: cmd)
 
         case .conversation:
-            // After Jarvis answers, the next utterance is part of the same dialogue: no wake word required.
+            // We are no longer waiting for the wake word: after Jarvis finishes speaking, the next
+            // real transcript is the next turn of the same conversation.
             guard Date().timeIntervalSince(restartedAt) > 0.35 else { return }
-            if echoCancelling {
-                guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-                beginCapture(.conversation, initial: text)
-            } else {
-                // Without echo cancellation, reject text that is wholly contained in Jarvis's latest speech.
-                let novel = Self.novelTail(heard: text, spoken: echoText())
-                guard !novel.isEmpty else { return }
-                beginCapture(.conversation, initial: novel.joined(separator: " "))
-            }
+            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { return }
+            // In conversation mode Jarvis is silent. Do not apply the old echo filter: it dropped
+            // short replies such as "sì", "no", "ok" and could confuse a user's next turn with the
+            // previous TTS transcript.
+            beginCapture(.conversation, initial: trimmed)
         }
     }
 
