@@ -34,6 +34,13 @@ struct GeminiAPI: Sendable {
     struct InteractionResult: Sendable {
         let jsonData: Data
         let interactionID: String
+
+        func stringValue(for key: String) -> String? {
+            guard
+                let object = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any]
+            else { return nil }
+            return object?[key] as? String
+        }
     }
 
     /// Primary model first, followed by stable fallback models.
