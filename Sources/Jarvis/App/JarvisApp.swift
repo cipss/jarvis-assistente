@@ -267,11 +267,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         if settingsWindow == nil {
             let w = NSWindow(contentRect: .zero, styleMask: [.titled, .closable], backing: .buffered, defer: false)
             w.title = "Impostazioni di Jarvis"
-            w.contentView = NSHostingView(rootView: SettingsView(coordinator: coordinator, initialTab: initialTab))
             w.isReleasedWhenClosed = false
             w.center()
             settingsWindow = w
         }
+        settingsWindow?.contentView = NSHostingView(rootView: SettingsView(coordinator: coordinator, initialTab: initialTab))
         NSApp.activate(ignoringOtherApps: true)
         settingsWindow?.makeKeyAndOrderFront(nil)
     }
