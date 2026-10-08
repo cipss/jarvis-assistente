@@ -103,7 +103,8 @@ struct GeminiAPI: Sendable {
         var body: [String: Any] = [
             "model": model,
             "input": prompt,
-            "system_instruction": systemInstruction
+            "system_instruction": systemInstruction,
+            "generation_config": ["thinking_level": "low", "thinking_summaries": "none"]
         ]
 
         if let previousInteractionID {
