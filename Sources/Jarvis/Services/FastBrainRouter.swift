@@ -90,6 +90,8 @@ struct FastBrainRouter: Sendable {
         schema: [String: Any]?,
         previousGeminiInteractionID: String? = nil
     ) async throws -> Result {
+        // [String: Any] is not Sendable under Swift 6 strict concurrency; freeze it before spawning provider tasks.
+        let schemaData = schema.flatMap { try? JSONSerialization.data(withJSONObject: $0) }
         let specs = candidateSpecs(prompt: prompt)
         guard !specs.isEmpty else { throw RouterError.noProvider }
 
@@ -104,7 +106,7 @@ struct FastBrainRouter: Sendable {
                             spec: spec,
                             systemInstruction: systemInstruction,
                             prompt: prompt,
-                            schema: schema,
+                            schemaData: schemaData,
                             previousGeminiInteractionID: previousGeminiInteractionID
                         )
                         return CandidateResult(result: result, latency: Date().timeIntervalSince(t))
@@ -176,12 +178,13 @@ struct FastBrainRouter: Sendable {
         spec: ProviderSpec,
         systemInstruction: String,
         prompt: String,
-        schema: [String: Any]?,
+        schemaData: Data?,
         previousGeminiInteractionID: String?
     ) async throws -> Result {
         switch spec.provider {
         case .gemini:
             guard let gemini else { throw RouterError.invalidResponse("Gemini") }
+            let schema = schemaData.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
             let result = try await gemini.generateJSON(
                 systemInstruction: systemInstruction,
                 prompt: prompt,
