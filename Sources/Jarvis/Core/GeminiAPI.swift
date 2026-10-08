@@ -32,7 +32,7 @@ struct GeminiAPI: Sendable {
     let model: String
 
     struct InteractionResult: Sendable {
-        let json: [String: Any]
+        let jsonData: Data
         let interactionID: String
     }
 
@@ -161,8 +161,8 @@ struct GeminiAPI: Sendable {
         guard let interactionID = root["id"] as? String, !interactionID.isEmpty else {
             throw GeminiError.invalidResponse
         }
-
-        return InteractionResult(json: json, interactionID: interactionID)
+        let jsonData = try JSONSerialization.data(withJSONObject: json)
+        return InteractionResult(jsonData: jsonData, interactionID: interactionID)
     }
 
     private static func extractOutputText(from root: [String: Any]) -> String {
