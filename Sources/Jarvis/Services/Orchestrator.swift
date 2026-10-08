@@ -215,11 +215,13 @@ struct Orchestrator: Sendable {
         Do not invent details.
         """
 
-        if let json = try? await gemini.generateJSON(
+        if let result = try? await gemini.generateJSON(
             systemInstruction: system,
             prompt: prompt,
             schema: schema
-        ), let speak = json["speak"] as? String, !speak.isEmpty {
+        ),
+           let speak = result.stringValue(for: "speak"),
+           !speak.isEmpty {
             return speak
         }
 
