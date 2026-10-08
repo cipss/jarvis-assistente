@@ -231,7 +231,7 @@ final class Coordinator {
         if voice.isSpeaking { voice.stop() }   // barge-in
         debounceTask?.cancel()
         debounceTask = Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .milliseconds(150))
+            try? await Task.sleep(for: .milliseconds(90))
             guard let self, !Task.isCancelled, holdStart != nil else { return }
             beginListening()
         }
@@ -241,7 +241,7 @@ final class Coordinator {
         AppLog.write("chord up (listening=\(listeningActive))")
         let started = holdStart; holdStart = nil
         debounceTask?.cancel(); debounceTask = nil
-        guard let started, Date().timeIntervalSince(started) >= 0.15, listeningActive else { return }
+        guard let started, Date().timeIntervalSince(started) >= 0.09, listeningActive else { return }
         Task { await finishListening() }
     }
 
