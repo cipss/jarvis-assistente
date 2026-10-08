@@ -294,25 +294,43 @@ final class Coordinator {
 
     private var orchestratorTurn: Task<Void, Never>?
 
+    var geminiConfigured: Bool { Secrets.get(Secrets.geminiKey) != nil }
+
     func handle(transcript: String) async {
-        guard let claudePath else { showError("Non trovo la CLI di Claude Code"); return }
-        // One orchestrator turn at a time — concurrent `claude -p` instances slow each other down.
+        guard geminiConfigured, let key = Secrets.get(Secrets.geminiKey) else {
+            showError("Gemini API non è configurata. Inserisci la chiave nelle Impostazioni → Agenti.")
+            return
+        }
         let previous = orchestratorTurn
-        let turn = Task { @MainActor in await previous?.value; await self.handleSerialized(transcript: transcript, claudePath: claudePath) }
+        let turn = Task { @MainActor in
+            await previous?.value
+            await self.handleSerialized(transcript: transcript, geminiKey: key)
+        }
         orchestratorTurn = turn
         await turn.value
     }
 
-    private func handleSerialized(transcript: String, claudePath: String) async {
+    private func handleSerialized(transcript: String, geminiKey: String) async {
         let gen = turnGeneration
-        let orch = Orchestrator(claudePath: claudePath, language: settings.settings.replyLanguage)
-        let action = await orch.decide(transcript: transcript, projects: registry.promptSummary, sessions: sessions.promptSummary,
-                                       maxSessions: settings.settings.maxConcurrentSessions, runningCount: sessions.running.count,
-                                       context: clarifyContext, memories: memory.promptSummary, history: memory.turnsSummary)
-        guard gen == turnGeneration else { AppLog.write("turn dropped (escaped): \"\(transcript)\""); return }
+        let gemini = GeminiAPI(apiKey: geminiKey, model: settings.settings.geminiModel)
+        let orch = Orchestrator(gemini: gemini, language: settings.settings.replyLanguage)
+        let action = await orch.decide(
+            transcript: transcript,
+            projects: registry.promptSummary,
+            sessions: sessions.promptSummary,
+            maxSessions: settings.settings.maxConcurrentSessions,
+            runningCount: sessions.running.count,
+            context: clarifyContext,
+            memories: memory.promptSummary,
+            history: memory.turnsSummary
+        )
+        guard gen == turnGeneration else {
+            AppLog.write("turn dropped (escaped): \\(transcript)")
+            return
+        }
         let priorContext = clarifyContext
         clarifyContext = nil
-        AppLog.write("transcript=\"\(transcript)\" → \(action)")
+        AppLog.write("transcript=\\"\(transcript)\\" → \\(action)")
         await perform(action, transcript: priorContext.map { "\($0) / \(transcript)" } ?? transcript)
     }
 
