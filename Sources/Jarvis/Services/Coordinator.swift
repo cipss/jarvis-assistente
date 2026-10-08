@@ -293,6 +293,8 @@ final class Coordinator {
     // MARK: Orchestration (§4)
 
     private var orchestratorTurn: Task<Void, Never>?
+    private var geminiInteractionID: String?
+    private var geminiConversationModel: String?
 
     var geminiConfigured: Bool { Secrets.get(Secrets.geminiKey) != nil }
 
