@@ -332,26 +332,26 @@ struct GeminiAPI: Sendable {
     }
 
     private static func extractJSONStringValue(in text: String, key: String) -> String? {
-        guard let keyRange = text.range(of: ""(key)""),
+        guard let keyRange = text.range(of: "\"\(key)\""),
               let colon = text[keyRange.upperBound...].firstIndex(of: ":") else { return nil }
 
         var i = text.index(after: colon)
         while i < text.endIndex, text[i].isWhitespace {
             i = text.index(after: i)
         }
-        guard i < text.endIndex, text[i] == """ else { return nil }
+        guard i < text.endIndex, text[i] == "\"" else { return nil }
 
         i = text.index(after: i)
         var escaped = false
-        var encoded = """
+        var encoded = "\""
         while i < text.endIndex {
             let ch = text[i]
             encoded.append(ch)
             if escaped {
                 escaped = false
-            } else if ch == "\" {
+            } else if ch == "\\" {
                 escaped = true
-            } else if ch == """ {
+            } else if ch == "\"" {
                 guard let data = encoded.data(using: .utf8),
                       let value = try? JSONSerialization.jsonObject(with: data) as? String else { return nil }
                 return value
