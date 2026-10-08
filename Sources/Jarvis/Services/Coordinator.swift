@@ -60,6 +60,7 @@ final class Coordinator {
         debounceTask?.cancel(); debounceTask = nil
         hideTask?.cancel()
         clarifyContext = nil
+        geminiInteractionID = nil
         memory.record(heard: "(ha premuto Esc: scambio annullato)", said: "", action: "cancelled", task: nil)
         pill.visible = false; pill.secondary = ""; pill.transcript = ""; pill.state = .listening
         pillDidChange()
