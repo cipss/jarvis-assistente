@@ -4,6 +4,7 @@ import Foundation
 /// Claude Code and Codex remain execution agents.
 struct Orchestrator: Sendable {
     let gemini: GeminiAPI
+    let brain: FastBrainRouter
     var language: String = "Italian"
 
     static func languageRule(_ language: String) -> String {
@@ -117,6 +118,7 @@ struct Orchestrator: Sendable {
     struct DecisionResult: Sendable {
         let action: OrchestratorAction?
         let interactionID: String?
+        let provider: FastBrainRouter.Provider?
     }
 
     func decide(
@@ -128,8 +130,7 @@ struct Orchestrator: Sendable {
         context: String?,
         memories: String = "- (nothing saved yet)",
         history: String = "- (none)",
-        previousInteractionID: String? = nil,
-        onSpeakReady: (@MainActor @Sendable (String) -> Void)? = nil
+        previousInteractionID: String? = nil
     ) async -> DecisionResult {
         let prompt = Self.userPrompt(
             projects: projects,
@@ -143,19 +144,14 @@ struct Orchestrator: Sendable {
         )
 
         do {
-            let result = try await gemini.generateJSON(
+            let result = try await brain.generateJSON(
                 systemInstruction: Self.systemPrompt + Self.languageRule(language),
                 prompt: prompt,
                 schema: Self.jsonSchema(),
-                previousInteractionID: previousInteractionID,
-                onSpeakReady: onSpeakReady.map { callback in
-                    { text in
-                        Task { @MainActor in callback(text) }
-                    }
-                }
+                previousGeminiInteractionID: previousInteractionID
             )
             if let action = try? JSONDecoder().decode(OrchestratorAction.self, from: result.jsonData) {
-                return DecisionResult(action: action, interactionID: result.interactionID)
+                return DecisionResult(action: action, interactionID: result.interactionID, provider: result.provider)
             }
             AppLog.write("gemini orchestrator returned JSON that did not match the schema")
         } catch {
@@ -175,7 +171,8 @@ struct Orchestrator: Sendable {
                     task: nil,
                     speak: "Gemini non ha risposto: \(detail)"
                 ),
-                interactionID: nil
+                interactionID: nil,
+                provider: nil
             )
         }
 
@@ -188,7 +185,8 @@ struct Orchestrator: Sendable {
                 task: nil,
                 speak: "Gemini ha restituito una risposta che non riesco a interpretare."
             ),
-            interactionID: nil
+            interactionID: nil,
+            provider: nil
         )
     }
 
