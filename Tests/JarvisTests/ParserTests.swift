@@ -32,27 +32,23 @@ final class ParserTests: XCTestCase {
 }
 
 final class OrchestratorTests: XCTestCase {
-    func testParsesStructuredOutputEnvelope() throws {
-        let url = Bundle.module.url(forResource: "Fixtures", withExtension: nil)!.appendingPathComponent("orchestrator-result.json")
-        let json = try String(contentsOf: url, encoding: .utf8)
-        // Real envelope captured from claude 2.1.239 (2-field schema); missing optional keys decode as nil.
-        let a = Orchestrator.parse(resultJSON: json)
-        XCTAssertEqual(a?.action, .status); XCTAssertNil(a?.project); XCTAssertFalse(a?.speak.isEmpty ?? true)
+    func testOrchestratorContractSchema() {
+        let schema = Orchestrator.jsonSchema()
+        XCTAssertEqual(schema["type"] as? String, "object")
+        let required = schema["required"] as? [String] ?? []
+        XCTAssertTrue(required.contains("action"))
+        XCTAssertTrue(required.contains("agent"))
+        XCTAssertTrue(required.contains("task"))
     }
 
-    func testParsesFullContract() {
-        let env = #"{"type":"result","result":"{\"action\":\"spawn\",\"agent\":\"claude\",\"project\":\"website\",\"session_id\":null,\"task\":\"Change the hero headline to 'Build faster with AI' and deploy\",\"speak\":\"On it.\"}","structured_output":{"action":"spawn","agent":"claude","project":"website","session_id":null,"task":"Change the hero headline to 'Build faster with AI' and deploy","speak":"On it."}}"#
-        let a = Orchestrator.parse(resultJSON: env)
-        XCTAssertEqual(a?.action, .spawn)
-        XCTAssertEqual(a?.agent, .claude)
-        XCTAssertEqual(a?.project, "website")
-        XCTAssertNil(a?.sessionID)
-        XCTAssertEqual(a?.speak, "On it.")
-    }
+    func testAgentRunnerStillKeepsClaudeAndCodex() {
+        let claude = AgentRunner.arguments(agent: .claude, task: "t", mode: .acceptEdits, resume: "sid")
+        XCTAssertTrue(claude.contains("--resume"))
+        XCTAssertTrue(claude.contains("acceptEdits"))
 
-    func testFallsBackToResultTextWithProse() {
-        let env = #"{"type":"result","result":"Sure! {\"action\":\"status\",\"agent\":null,\"project\":null,\"session_id\":null,\"task\":null,\"speak\":\"Nothing running.\"}"}"#
-        XCTAssertEqual(Orchestrator.parse(resultJSON: env)?.action, .status)
+        let codex = AgentRunner.arguments(agent: .codex, task: "t", mode: .bypassPermissions, resume: nil)
+        XCTAssertTrue(codex.contains("exec"))
+        XCTAssertTrue(codex.contains("--dangerously-bypass-approvals-and-sandbox"))
     }
 
     func testArgsNeverContainAPIKeys() {

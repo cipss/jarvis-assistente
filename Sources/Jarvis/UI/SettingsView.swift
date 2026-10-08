@@ -72,17 +72,65 @@ struct AgentsTab: View {
     @Bindable var coordinator: Coordinator
     @State private var claudeVersion = "…"
     @State private var codexVersion = "…"
+    @State private var geminiKeyField = ""
+    @State private var hasGeminiKey = Secrets.get(Secrets.geminiKey) != nil
+    @State private var geminiStatus = ""
+
     var body: some View {
         @Bindable var s = coordinator.settings
         Form {
-            Section("Trovati sul Mac") {
-                LabeledContent("claude") { Text(coordinator.claudePath.map { "\($0)  ·  \(claudeVersion)" } ?? "non trovato").font(.caption).foregroundStyle(.secondary).textSelection(.enabled) }
-                LabeledContent("codex") { Text(coordinator.codexPath.map { "\($0)  ·  \(codexVersion)" } ?? "non trovato").font(.caption).foregroundStyle(.secondary).textSelection(.enabled) }
+            Section("Cervello di Jarvis") {
+                LabeledContent("Gemini API") {
+                    Text(hasGeminiKey ? "Configurata" : "Non configurata")
+                        .foregroundStyle(hasGeminiKey ? .primary : .secondary)
+                }
+                LabeledContent("Chiave API") {
+                    HStack {
+                        SecureField("Incolla GEMINI_API_KEY", text: $geminiKeyField)
+                            .textFieldStyle(.roundedBorder)
+                        Button(hasGeminiKey ? "Sostituisci" : "Salva") { saveGeminiKey() }
+                            .disabled(geminiKeyField.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    }
+                }
+                HStack {
+                    Text("Modello")
+                    TextField("gemini-3.8-flash", text: $s.settings.geminiModel)
+                        .textFieldStyle(.roundedBorder)
+                    Button("Rimuovi chiave") {
+                        Secrets.delete(Secrets.geminiKey)
+                        hasGeminiKey = false
+                        geminiStatus = "Chiave rimossa."
+                    }
+                    .disabled(!hasGeminiKey)
+                }
+                Text("Gemini è il cervello principale: decide routing, memoria, follow-up e riassunti. Claude Code e Codex restano gli esecutori.")
+                    .font(.caption).foregroundStyle(.secondary)
+                if !geminiStatus.isEmpty {
+                    Text(geminiStatus).font(.caption).foregroundStyle(.secondary)
+                }
             }
-            Section("Predefiniti") {
-                Picker("Agente predefinito", selection: $s.settings.defaultAgent) { ForEach(AgentKind.allCases) { Text($0.displayName).tag($0) } }
-                Picker("Permessi di Claude", selection: $s.settings.claudePermissionMode) { ForEach(PermissionMode.allCases) { Text($0.displayName).tag($0) } }
-                Picker("Permessi di Codex", selection: $s.settings.codexPermissionMode) { ForEach(PermissionMode.allCases) { Text($0.displayName).tag($0) } }
+
+            Section("Esecutori disponibili") {
+                LabeledContent("Claude Code") {
+                    Text(coordinator.claudePath.map { "\($0)  ·  \(claudeVersion)" } ?? "non trovato")
+                        .font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
+                }
+                LabeledContent("Codex") {
+                    Text(coordinator.codexPath.map { "\($0)  ·  \(codexVersion)" } ?? "non trovato")
+                        .font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
+                }
+            }
+
+            Section("Predefiniti degli esecutori") {
+                Picker("Agente predefinito", selection: $s.settings.defaultAgent) {
+                    ForEach(AgentKind.allCases) { Text($0.displayName).tag($0) }
+                }
+                Picker("Permessi di Claude", selection: $s.settings.claudePermissionMode) {
+                    ForEach(PermissionMode.allCases) { Text($0.displayName).tag($0) }
+                }
+                Picker("Permessi di Codex", selection: $s.settings.codexPermissionMode) {
+                    ForEach(PermissionMode.allCases) { Text($0.displayName).tag($0) }
+                }
                 Stepper("Sessioni contemporanee al massimo: \(s.settings.maxConcurrentSessions)", value: $s.settings.maxConcurrentSessions, in: 1...6)
             }
         }
@@ -90,6 +138,18 @@ struct AgentsTab: View {
         .task {
             if let p = coordinator.claudePath { claudeVersion = await CLILocator.version(of: p) ?? "?" }
             if let p = coordinator.codexPath { codexVersion = await CLILocator.version(of: p) ?? "?" }
+        }
+    }
+
+    private func saveGeminiKey() {
+        let key = geminiKeyField.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !key.isEmpty else { return }
+        if Secrets.set(key, for: Secrets.geminiKey) {
+            hasGeminiKey = true
+            geminiKeyField = ""
+            geminiStatus = "Chiave Gemini salvata localmente."
+        } else {
+            geminiStatus = "Non riesco a salvare la chiave."
         }
     }
 }

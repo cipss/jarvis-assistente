@@ -141,6 +141,8 @@ struct Settings: Codable, Sendable {
     var generalWorkspace: String = ""
     /// Claude model for coding tasks (building or changing software). Other tasks use the CLI default.
     var codingModel: String = "claude-opus-5-5"
+    /// Primary Gemini model used as Jarvis brain/orchestrator.
+    var geminiModel: String = "gemini-3.8-flash"
     /// When a session built something to look at (an HTML page, a site on localhost), open it at the end.
     var openResults: Bool = true
     var muteDuringFocus: Bool = true
@@ -183,6 +185,7 @@ struct Settings: Codable, Sendable {
         wakeOnClap = try c.decodeIfPresent(Bool.self, forKey: .wakeOnClap) ?? d.wakeOnClap
         generalWorkspace = try c.decodeIfPresent(String.self, forKey: .generalWorkspace) ?? d.generalWorkspace
         codingModel = try c.decodeIfPresent(String.self, forKey: .codingModel) ?? d.codingModel
+        geminiModel = try c.decodeIfPresent(String.self, forKey: .geminiModel) ?? d.geminiModel
         openResults = try c.decodeIfPresent(Bool.self, forKey: .openResults) ?? d.openResults
         muteDuringFocus = try c.decodeIfPresent(Bool.self, forKey: .muteDuringFocus) ?? d.muteDuringFocus
         blipOnChordDown = try c.decodeIfPresent(Bool.self, forKey: .blipOnChordDown) ?? d.blipOnChordDown
