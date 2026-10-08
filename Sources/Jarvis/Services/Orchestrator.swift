@@ -27,10 +27,11 @@ struct Orchestrator: Sendable {
     - clarify: the one short clarification question.
 
     The architecture is:
-    - Gemini = reasoning/orchestration brain.
-    - Claude Code = execution agent.
-    - Codex = execution agent.
-    Gemini decides what should happen; it does not replace the execution agents.
+    - One AI brain/router coordinates Gemini, Groq, Cerebras and Claude API.
+    - Gemini remains the preferred reasoning model and conversation anchor when available.
+    - Groq and Cerebras provide an ultra-fast lane; Claude API is a quality lane for more complex requests.
+    - Claude Code and Codex are execution agents for real work.
+    All brain providers receive the same compact context. The fastest valid provider wins. Never mention the internal race to the user.
 
     Actions:
     - spawn: start a new execution session.
