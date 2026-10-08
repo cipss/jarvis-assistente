@@ -98,6 +98,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         handsFreeItem?.state = coordinator.settings.settings.handsFree ? .on : .off
         menu.addItem(.separator())
         menu.addItem(withTitle: "Progetti…", action: #selector(showProjects), keyEquivalent: "")
+        menu.addItem(withTitle: "✨ Configura Gemini…", action: #selector(showGeminiSettings), keyEquivalent: "")
         menu.addItem(withTitle: "Impostazioni…", action: #selector(showSettings), keyEquivalent: ",")
         menu.addItem(withTitle: "Rifai la configurazione iniziale", action: #selector(showOnboardingAction), keyEquivalent: "")
         menu.addItem(.separator())
@@ -259,13 +260,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     @objc private func toggleOverlayAction() { toggleOverlay() }
 
     @objc private func showSettings() { presentSettings() }
+    @objc private func showGeminiSettings() { presentSettings(initialTab: .gemini) }
     @objc private func showProjects() { presentSettings() }
 
-    private func presentSettings() {
+    private func presentSettings(initialTab: SettingsTab = .general) {
         if settingsWindow == nil {
             let w = NSWindow(contentRect: .zero, styleMask: [.titled, .closable], backing: .buffered, defer: false)
             w.title = "Impostazioni di Jarvis"
-            w.contentView = NSHostingView(rootView: SettingsView(coordinator: coordinator))
+            w.contentView = NSHostingView(rootView: SettingsView(coordinator: coordinator, initialTab: initialTab))
             w.isReleasedWhenClosed = false
             w.center()
             settingsWindow = w
