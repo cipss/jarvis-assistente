@@ -134,7 +134,7 @@ struct GeminiTab: View {
                     HStack {
                         Image(systemName: "sparkles")
                             .foregroundStyle(.blue)
-                        TextField("gemini-3.8-flash", text: $s.settings.geminiModel)
+                        TextField("gemini-3.5-flash-lite", text: $s.settings.geminiModel)
                             .textFieldStyle(.roundedBorder)
                     }
                 }
