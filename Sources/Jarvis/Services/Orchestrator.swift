@@ -101,7 +101,7 @@ struct Orchestrator: Sendable {
         if let context {
             prompt += "Previous turns of this same request: \(context)\n\n"
         }
-        prompt += "Transcript: "\(transcript)""
+        prompt += "Transcript: \"\(transcript)\""
         return prompt
     }
 
