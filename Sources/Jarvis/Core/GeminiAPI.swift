@@ -22,15 +22,17 @@ struct GeminiAPI: Sendable {
     func generateJSON(
         systemInstruction: String,
         prompt: String,
-        schema: [String: Any],
-        temperature: Double = 0.1
+        schema: [String: Any]
     ) async throws -> [String: Any] {
         guard !apiKey.isEmpty else { throw GeminiError.missingKey }
 
-        var generationConfig: [String: Any] = [
-            "temperature": temperature,
-            "responseMimeType": "application/json",
-            "responseSchema": schema
+        let generationConfig: [String: Any] = [
+            "responseFormat": [
+                "text": [
+                    "mimeType": "application/json",
+                    "schema": schema
+                ]
+            ]
         ]
 
         let body: [String: Any] = [
