@@ -325,12 +325,12 @@ final class Coordinator {
             history: memory.turnsSummary
         )
         guard gen == turnGeneration else {
-            AppLog.write("turn dropped (escaped): \\(transcript)")
+            AppLog.write("turn dropped (escaped): \(transcript)")
             return
         }
         let priorContext = clarifyContext
         clarifyContext = nil
-        AppLog.write("transcript=\\"\(transcript)\\" → \\(action)")
+        AppLog.write("transcript=\\"\(transcript)\\" → \(action)")
         await perform(action, transcript: priorContext.map { "\($0) / \(transcript)" } ?? transcript)
     }
 
