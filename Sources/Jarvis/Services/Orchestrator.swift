@@ -57,20 +57,25 @@ struct Orchestrator: Sendable {
             "type": "object",
             "additionalProperties": false,
             "properties": [
-                "action": ["type": "string", "enum": ["spawn","followup","cancel","status","open","clarify","chitchat","create"]],
-                "agent": ["type": ["string","null"], "enum": ["claude","codex"]],
-                "project": ["type": ["string","null"]],
-                "session_id": ["type": ["string","null"]],
-                "task": ["type": ["string","null"]],
+                "action": [
+                    "type": "string",
+                    "enum": ["spawn","followup","cancel","status","open","clarify","chitchat","create"]
+                ],
+                "agent": [
+                    "type": "string",
+                    "enum": ["claude","codex"]
+                ],
+                "project": ["type": "string"],
+                "session_id": ["type": "string"],
+                "task": ["type": "string"],
                 "speak": ["type": "string"],
-                "remember": ["type": ["string","null"]],
-                "forget": ["type": ["string","null"]],
-                "coding": ["type": ["boolean","null"]]
+                "remember": ["type": "string"],
+                "forget": ["type": "string"],
+                "coding": ["type": "boolean"]
             ],
-            "required": ["action","agent","project","session_id","task","speak","remember","forget","coding"]
+            "required": ["action","speak"]
         ]
     }
-
     static func userPrompt(
         projects: String,
         sessions: String,
