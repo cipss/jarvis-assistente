@@ -241,9 +241,9 @@ final class WakeService {
                 let words = self.command.split(whereSeparator: { $0.isWhitespace || $0.isPunctuation }).count
                 let hasWords = words > 0
                 self.onCaptureUpdate?(self.command, self.level)
-                // Fast but safe end-of-turn detection: short utterances get 0.9 s, normal commands 0.65 s.
+                // Fast turn-taking: normal utterances close after 0.45 s, short replies after 0.65 s.
                 // Never cut an utterance before some text is present, and keep the hard 30 s safety cap.
-                let silenceLimit = words >= 4 ? 0.65 : 0.9
+                let silenceLimit = words >= 4 ? 0.45 : 0.65
                 if (hasWords && quiet > silenceLimit) || (!hasWords && total > 5) || total > 30 { self.finishCapture(); return }
             }
         }
