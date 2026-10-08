@@ -8,7 +8,7 @@ import AVFoundation
 /// service stays off). Claps are found by an energy detector on the raw samples.
 ///
 /// After the name (or the claps) the same recognizer keeps listening and captures the command: everything said after it, in one
-/// breath or after a pause, until 1.5 s without new words. While Jarvis talks, talking over it pauses it (see
+/// breath or after a pause, until a short adaptive silence window without new words. While Jarvis talks, talking over it pauses it (see
 /// `novelTail`). The Coordinator makes the service busy while Jarvis thinks and stops it during push-to-talk,
 /// which uses its own audio engine.
 @MainActor
@@ -227,9 +227,13 @@ final class WakeService {
                 try? await Task.sleep(for: .milliseconds(100))
                 let quiet = Date().timeIntervalSince(self.lastChange)
                 let total = Date().timeIntervalSince(self.captureStart)
-                let hasWords = !self.command.trimmingCharacters(in: .whitespaces).isEmpty
+                let words = self.command.split(whereSeparator: { $0.isWhitespace || $0.isPunctuation }).count
+                let hasWords = words > 0
                 self.onCaptureUpdate?(self.command, self.level)
-                if (hasWords && quiet > 1.5) || (!hasWords && total > 6) || total > 30 { self.finishCapture(); return }
+                // Fast but safe end-of-turn detection: short utterances get 0.9 s, normal commands 0.65 s.
+                // Never cut an utterance before some text is present, and keep the hard 30 s safety cap.
+                let silenceLimit = words >= 4 ? 0.65 : 0.9
+                if (hasWords && quiet > silenceLimit) || (!hasWords && total > 5) || total > 30 { self.finishCapture(); return }
             }
         }
     }
