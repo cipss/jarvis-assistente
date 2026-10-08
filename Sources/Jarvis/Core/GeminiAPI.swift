@@ -36,16 +36,16 @@ struct GeminiAPI: Sendable {
         let interactionID: String
 
         func stringValue(for key: String) -> String? {
-            guard
-                let object = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any]
-            else { return nil }
-            return object?[key] as? String
+            guard let object = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any] else {
+                return nil
+            }
+            return object[key] as? String
         }
     }
 
     /// Primary model first, followed by stable fallback models.
     private var candidateModels: [String] {
-        var models = [model, "gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash"]
+        let models = [model, "gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash"]
         var seen = Set<String>()
         return models.filter { seen.insert($0).inserted }
     }
@@ -161,16 +161,17 @@ struct GeminiAPI: Sendable {
             cleaned = text
         }
 
-        guard let jsonData = cleaned.data(using: .utf8),
-              let json = try JSONSerialization.jsonObject(with: jsonData) as? [String: Any] else {
+        guard let rawJSONData = cleaned.data(using: .utf8),
+              let json = try JSONSerialization.jsonObject(with: rawJSONData) as? [String: Any] else {
             throw GeminiError.invalidResponse
         }
 
         guard let interactionID = root["id"] as? String, !interactionID.isEmpty else {
             throw GeminiError.invalidResponse
         }
-        let jsonData = try JSONSerialization.data(withJSONObject: json)
-        return InteractionResult(jsonData: jsonData, interactionID: interactionID)
+
+        let resultJSONData = try JSONSerialization.data(withJSONObject: json)
+        return InteractionResult(jsonData: resultJSONData, interactionID: interactionID)
     }
 
     private static func extractOutputText(from root: [String: Any]) -> String {
@@ -211,7 +212,7 @@ struct GeminiAPI: Sendable {
                         systemInstruction: "Respond with exactly: OK",
                         prompt: "Connection test."
                     )
-                    return value.isEmpty ? candidate : candidate
+                    return value.isEmpty ? candidate : value
                 } catch {
                     lastError = error
                     let retryable = (error as? GeminiError)?.statusCode.map {
