@@ -115,7 +115,7 @@ struct ConversationTurn: Codable, Hashable, Sendable {
 
 // MARK: - Settings
 
-enum BrainMode: String, Codable, Sendable, CaseIterable {
+enum BrainMode: String, Codable, Sendable, CaseIterable, Hashable {
     case fastest
     case geminiOnly
 
