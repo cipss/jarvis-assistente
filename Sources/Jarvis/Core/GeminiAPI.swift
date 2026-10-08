@@ -21,14 +21,12 @@ struct GeminiAPI: Sendable {
 
     func generateJSON(
         systemInstruction: String,
-        prompt: String,
-        schema: [String: Any]
+        prompt: String
     ) async throws -> [String: Any] {
         guard !apiKey.isEmpty else { throw GeminiError.missingKey }
 
         let generationConfig: [String: Any] = [
-            "responseMimeType": "application/json",
-            "responseSchema": schema
+            "responseMimeType": "application/json"
         ]
 
         let body: [String: Any] = [
@@ -58,7 +56,10 @@ struct GeminiAPI: Sendable {
         guard let http = response as? HTTPURLResponse else { throw GeminiError.invalidResponse }
 
         guard (200..<300).contains(http.statusCode) else {
-            throw GeminiError.http(http.statusCode, "\(model): " + String((String(data: responseData, encoding: .utf8) ?? "").prefix(1200)))
+            throw GeminiError.http(
+                http.statusCode,
+                "\(model): " + String((String(data: responseData, encoding: .utf8) ?? "").prefix(1500))
+            )
         }
 
         guard
@@ -70,12 +71,25 @@ struct GeminiAPI: Sendable {
             throw GeminiError.invalidResponse
         }
 
-        let text = parts.compactMap { $0["text"] as? String }.joined().trimmingCharacters(in: .whitespacesAndNewlines)
+        let text = parts
+            .compactMap { $0["text"] as? String }
+            .joined()
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
         guard !text.isEmpty else { throw GeminiError.emptyResponse }
 
-        guard let jsonData = text.data(using: .utf8),
+        let cleaned: String
+        if let start = text.firstIndex(of: "{"), let end = text.lastIndex(of: "}") {
+            cleaned = String(text[start...end])
+        } else {
+            cleaned = text
+        }
+
+        guard let jsonData = cleaned.data(using: .utf8),
               let json = try JSONSerialization.jsonObject(with: jsonData) as? [String: Any]
-        else { throw GeminiError.invalidResponse }
+        else {
+            throw GeminiError.invalidResponse
+        }
 
         return json
     }
