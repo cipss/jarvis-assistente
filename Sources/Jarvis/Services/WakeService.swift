@@ -13,9 +13,9 @@ import AVFoundation
 /// which uses its own audio engine.
 @MainActor
 final class WakeService {
-    enum Trigger: String { case name, clap, bargeIn }
-    /// What counts as a start: the name (idle), the user's words over Jarvis's (speaking), nothing (thinking).
-    enum Mode: Equatable { case idle, speaking, busy }
+    enum Trigger: String { case name, clap, bargeIn, conversation }
+    /// What counts as a start: the name (idle), words over Jarvis, or any speech inside an active conversation.
+    enum Mode: Equatable { case idle, speaking, conversation, busy }
 
     var onWake: ((Trigger) -> Void)?
     var onCaptureUpdate: ((String, Float) -> Void)?
@@ -194,6 +194,19 @@ final class WakeService {
             // Words before the name in this transcript (room talk, "ok"): the name there is the call.
             nameWithin = max(3, Self.wordsBeforeLastName(in: text) + 1)
             beginCapture(.name, initial: cmd)
+
+        case .conversation:
+            // After Jarvis answers, the next utterance is part of the same dialogue: no wake word required.
+            guard Date().timeIntervalSince(restartedAt) > 0.35 else { return }
+            if echoCancelling {
+                guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+                beginCapture(.conversation, initial: text)
+            } else {
+                // Without echo cancellation, reject text that is wholly contained in Jarvis's latest speech.
+                let novel = Self.novelTail(heard: text, spoken: echoText())
+                guard !novel.isEmpty else { return }
+                beginCapture(.conversation, initial: novel.joined(separator: " "))
+            }
         }
     }
 
