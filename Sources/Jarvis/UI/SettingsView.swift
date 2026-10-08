@@ -149,6 +149,16 @@ struct GeminiTab: View {
                     .disabled(!hasKey)
                 }
 
+                HStack {
+                    Spacer()
+                    Button {
+                        Task { await testGemini() }
+                    } label: {
+                        Label("Testa connessione", systemImage: "bolt.horizontal.circle")
+                    }
+                    .disabled(!hasKey)
+                }
+
                 if !status.isEmpty {
                     Text(status)
                         .font(.caption)
@@ -168,6 +178,30 @@ struct GeminiTab: View {
             }
         }
         .formStyle(.grouped)
+    }
+
+    private func testGemini() async {
+        guard let key = Secrets.get(Secrets.geminiKey), !key.isEmpty else {
+            status = "Chiave Gemini non configurata."
+            return
+        }
+        status = "Test in corso…"
+        let schema: [String: Any] = [
+            "type": "object",
+            "properties": ["ok": ["type": "boolean"]],
+            "required": ["ok"]
+        ]
+        do {
+            let json = try await GeminiAPI(apiKey: key, model: coordinator.settings.settings.geminiModel)
+                .generateJSON(
+                    systemInstruction: "Rispondi con un JSON contenente solo ok=true.",
+                    prompt: "Test di connessione. Restituisci ok=true.",
+                    schema: schema
+                )
+            status = (json["ok"] as? Bool) == true ? "Gemini raggiungibile e funzionante." : "Gemini ha risposto, ma il test JSON non è valido."
+        } catch {
+            status = "Errore Gemini: (error.localizedDescription)"
+        }
     }
 
     private func saveKey() {
