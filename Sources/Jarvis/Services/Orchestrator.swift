@@ -110,6 +110,11 @@ struct Orchestrator: Sendable {
         return prompt
     }
 
+    struct DecisionResult: Sendable {
+        let action: OrchestratorAction?
+        let interactionID: String?
+    }
+
     func decide(
         transcript: String,
         projects: String,
@@ -118,8 +123,9 @@ struct Orchestrator: Sendable {
         runningCount: Int,
         context: String?,
         memories: String = "- (nothing saved yet)",
-        history: String = "- (none)"
-    ) async -> OrchestratorAction {
+        history: String = "- (none)",
+        previousInteractionID: String? = nil
+    ) async -> DecisionResult {
         let prompt = Self.userPrompt(
             projects: projects,
             sessions: sessions,
@@ -132,14 +138,14 @@ struct Orchestrator: Sendable {
         )
 
         do {
-            let json = try await gemini.generateJSON(
+            let result = try await gemini.generateJSON(
                 systemInstruction: Self.systemPrompt + Self.languageRule(language),
                 prompt: prompt,
-                schema: Self.jsonSchema()
+                schema: Self.jsonSchema(),
+                previousInteractionID: previousInteractionID
             )
-            let data = try JSONSerialization.data(withJSONObject: json)
-            if let action = try? JSONDecoder().decode(OrchestratorAction.self, from: data) {
-                return action
+            if let action = try? JSONDecoder().decode(OrchestratorAction.self, from: result.jsonData) {
+                return DecisionResult(action: action, interactionID: result.interactionID)
             }
             AppLog.write("gemini orchestrator returned JSON that did not match the schema")
         } catch {
@@ -150,23 +156,29 @@ struct Orchestrator: Sendable {
             } else {
                 detail = error.localizedDescription
             }
-            return OrchestratorAction(
+            return DecisionResult(
+                action: OrchestratorAction(
+                    action: .chitchat,
+                    agent: nil,
+                    project: nil,
+                    sessionID: nil,
+                    task: nil,
+                    speak: "Gemini non ha risposto: \(detail)"
+                ),
+                interactionID: nil
+            )
+        }
+
+        return DecisionResult(
+            action: OrchestratorAction(
                 action: .chitchat,
                 agent: nil,
                 project: nil,
                 sessionID: nil,
                 task: nil,
-                speak: "Gemini non ha risposto: \(detail)"
-            )
-        }
-
-        return OrchestratorAction(
-            action: .chitchat,
-            agent: nil,
-            project: nil,
-            sessionID: nil,
-            task: nil,
-            speak: "Gemini ha restituito una risposta che non riesco a interpretare."
+                speak: "Gemini ha restituito una risposta che non riesco a interpretare."
+            ),
+            interactionID: nil
         )
     }
 
