@@ -35,9 +35,6 @@ final class Coordinator {
     private var askedWakePermissions = false
     /// Keeps the no-wake-word conversation window alive after each answer.
     private var conversationUntil: Date?
-    /// Spoken as soon as Gemini's streamed JSON yields a safe action + speak pair.
-    private var earlySpokenGeneration = -1
-    private var earlySpokenText = ""
 
     var onPillChanged: (() -> Void)?
 
@@ -67,8 +64,6 @@ final class Coordinator {
         clarifyContext = nil
         geminiInteractionID = nil
         conversationUntil = nil
-        earlySpokenGeneration = -1
-        earlySpokenText = ""
         memory.record(heard: "(ha premuto Esc: scambio annullato)", said: "", action: "cancelled", task: nil)
         pill.visible = false; pill.secondary = ""; pill.transcript = ""; pill.state = .listening
         pillDidChange()
@@ -353,9 +348,15 @@ final class Coordinator {
             ? memory.turnsSummary
             : "- Conversazione precedente mantenuta da Gemini sul server."
         let gemini = GeminiAPI(apiKey: geminiKey, model: model)
-        let orch = Orchestrator(gemini: gemini, language: settings.settings.replyLanguage)
-        earlySpokenGeneration = gen
-        earlySpokenText = ""
+        let brain = FastBrainRouter(
+            mode: settings.settings.brainMode,
+            maxParallel: settings.settings.maxParallelBrains,
+            gemini: gemini,
+            groqKey: Secrets.get(Secrets.groqKey),
+            cerebrasKey: Secrets.get(Secrets.cerebrasKey),
+            anthropicKey: Secrets.get(Secrets.anthropicKey)
+        )
+        let orch = Orchestrator(gemini: gemini, brain: brain, language: settings.settings.replyLanguage)
 
         let decision = await orch.decide(
             transcript: transcript,
@@ -366,17 +367,7 @@ final class Coordinator {
             context: clarifyContext,
             memories: memory.promptSummary,
             history: conversationHistory,
-            previousInteractionID: previousInteractionID,
-            onSpeakReady: { [weak self] text in
-                guard let self, self.turnGeneration == gen, !Task.isCancelled else { return }
-                let clean = Self.speakable(text)
-                guard !clean.isEmpty else { return }
-                self.earlySpokenGeneration = gen
-                self.earlySpokenText = text
-                self.conversationUntil = Date().addingTimeInterval(60)
-                self.hideTask?.cancel()
-                self.say(text)
-            }
+            previousInteractionID: previousInteractionID
         )
 
         guard !Task.isCancelled, gen == turnGeneration else {
@@ -393,16 +384,18 @@ final class Coordinator {
             speak: "Non ho ricevuto una decisione valida da Gemini."
         )
 
-        if let newInteractionID = decision.interactionID {
-            geminiInteractionID = newInteractionID
+        if decision.provider == .gemini {
+            geminiInteractionID = decision.interactionID
+        } else {
+            // A non-Gemini winner has no Gemini interaction chain; keep cross-provider context in the compact history.
+            geminiInteractionID = nil
         }
 
         let priorContext = clarifyContext
         clarifyContext = nil
         AppLog.write("transcript=\"\(transcript)\" → \(action)")
         let finalTranscript = priorContext.map { "\($0) / \(transcript)" } ?? transcript
-        let preSpoken = (earlySpokenGeneration == gen && !earlySpokenText.isEmpty) ? earlySpokenText : nil
-        await perform(action, transcript: finalTranscript, preSpokenText: preSpoken)
+        await perform(action, transcript: finalTranscript)
         // Re-arm the dialogue immediately. TTS still has priority; when it finishes refreshWake enters conversation mode.
         conversationUntil = Date().addingTimeInterval(60)
         refreshWake()
@@ -447,7 +440,7 @@ final class Coordinator {
         return t.replacingOccurrences(of: #"\s{2,}"#, with: " ", options: .regularExpression).trimmingCharacters(in: .whitespaces)
     }
 
-    func perform(_ raw: OrchestratorAction, transcript: String, preSpokenText: String? = nil) async {
+    func perform(_ raw: OrchestratorAction, transcript: String) async {
         let a = Self.sanitize(raw, transcript: transcript)
         // Memory side-effects happen regardless of which action was chosen.
         if let f = a.forget, !f.isEmpty { let n = memory.forget(f); if n == 0 && a.action == .chitchat { say("Non avevo niente di simile in memoria."); memory.record(heard: transcript, said: "niente da dimenticare", action: "forget"); return } }
@@ -516,8 +509,7 @@ final class Coordinator {
             }
         }
         memory.record(heard: transcript, said: speak, action: a.action.rawValue, task: a.task, project: a.project)
-        let alreadySpoken = preSpokenText.map { Self.speakable($0) == Self.speakable(speak) } ?? false
-        if !alreadySpoken { say(speak) }
+        say(speak)
     }
 
     /// Workspace for non-project requests ("riassumimi le mail", "cosa ho in calendario"). Best is a knowledge base
@@ -676,7 +668,8 @@ final class Coordinator {
         let model = settings.settings.geminiModel
         Task {
             let gemini = GeminiAPI(apiKey: key, model: model)
-            let summary = await Orchestrator(gemini: gemini, language: settings.settings.replyLanguage).summarize(task: s.task, project: s.projectName, result: result,
+            let brain = FastBrainRouter(mode: .geminiOnly, maxParallel: 1, gemini: gemini, groqKey: nil, cerebrasKey: nil, anthropicKey: nil)
+            let summary = await Orchestrator(gemini: gemini, brain: brain, language: settings.settings.replyLanguage).summarize(task: s.task, project: s.projectName, result: result,
                                                                                   isError: s.status != .done, exitCode: code, opened: opened)
             announce(summary)
         }
