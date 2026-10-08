@@ -148,17 +148,24 @@ final class VoiceService: NSObject, AVAudioPlayerDelegate, AVSpeechSynthesizerDe
 /// Fish Audio REST client. Verified against https://api.fish.audio/openapi.json at build time.
 enum FishAudio {
     static let base = URL(string: "https://api.fish.audio")!
+
     /// Own session: short timeouts so a dead socket fails fast instead of leaving the user waiting.
     nonisolated(unsafe) static let session: URLSession = {
-        let c = URLSessionConfiguration.default
-        c.timeoutIntervalForRequest = 12; c.timeoutIntervalForResource = 20
-        c.waitsForConnectivity = false
-        return URLSession(configuration: c)
+        let configuration = URLSessionConfiguration.default
+        configuration.timeoutIntervalForRequest = 12
+        configuration.timeoutIntervalForResource = 20
+        configuration.waitsForConnectivity = false
+        return URLSession(configuration: configuration)
     }()
+
     static let model = "s2.1-pro"       // "S2.1 Pro" — $15 / 1M chars of API credit
     static let freeModel = "s2.1-pro-free" // $0, verified working with zero API credit
 
-    struct APIError: Error, CustomStringConvertible { let status: Int; let body: String; var description: String { "Fish \(status): \(body.prefix(120))" } }
+    struct APIError: Error, CustomStringConvertible {
+        let status: Int
+        let body: String
+        var description: String { "Fish \(status): \(body.prefix(120))" }
+    }
 
     static func synthesize(text: String, apiKey: String, voiceID: String, speed: Double, model: String = model) async throws -> Data {
         var req = URLRequest(url: base.appendingPathComponent("v1/tts"))
