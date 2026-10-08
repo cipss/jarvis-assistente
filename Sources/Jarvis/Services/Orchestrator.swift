@@ -154,7 +154,7 @@ struct Orchestrator: Sendable {
             if let action = try? JSONDecoder().decode(OrchestratorAction.self, from: result.jsonData) {
                 return DecisionResult(action: action, interactionID: result.interactionID, provider: result.provider)
             }
-            AppLog.write("gemini orchestrator returned JSON that did not match the schema")
+            AppLog.write("brain router returned JSON that did not match the schema")
         } catch {
             AppLog.write("gemini orchestrator error: \(error.localizedDescription)")
             let detail: String
@@ -170,7 +170,7 @@ struct Orchestrator: Sendable {
                     project: nil,
                     sessionID: nil,
                     task: nil,
-                    speak: "Gemini non ha risposto: \(detail)"
+                    speak: "Nessun provider AI ha risposto: \(detail)"
                 ),
                 interactionID: nil,
                 provider: nil
