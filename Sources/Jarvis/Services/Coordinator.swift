@@ -35,6 +35,9 @@ final class Coordinator {
     private var askedWakePermissions = false
     /// Keeps the no-wake-word conversation window alive after each answer.
     private var conversationUntil: Date?
+    /// Spoken as soon as Gemini's streamed JSON yields a safe action + speak pair.
+    private var earlySpokenGeneration = -1
+    private var earlySpokenText = ""
 
     var onPillChanged: (() -> Void)?
 
@@ -64,6 +67,8 @@ final class Coordinator {
         clarifyContext = nil
         geminiInteractionID = nil
         conversationUntil = nil
+        earlySpokenGeneration = -1
+        earlySpokenText = ""
         memory.record(heard: "(ha premuto Esc: scambio annullato)", said: "", action: "cancelled", task: nil)
         pill.visible = false; pill.secondary = ""; pill.transcript = ""; pill.state = .listening
         pillDidChange()
@@ -76,6 +81,8 @@ final class Coordinator {
         clarifyContext = nil
         geminiInteractionID = nil
         conversationUntil = nil
+        earlySpokenGeneration = -1
+        earlySpokenText = ""
         AppLog.write("history cleared")
     }
     var onOverlayToggle: (() -> Void)?
@@ -347,6 +354,9 @@ final class Coordinator {
             : "- Conversazione precedente mantenuta da Gemini sul server."
         let gemini = GeminiAPI(apiKey: geminiKey, model: model)
         let orch = Orchestrator(gemini: gemini, language: settings.settings.replyLanguage)
+        earlySpokenGeneration = gen
+        earlySpokenText = ""
+
         let decision = await orch.decide(
             transcript: transcript,
             projects: registry.promptSummary,
@@ -356,7 +366,15 @@ final class Coordinator {
             context: clarifyContext,
             memories: memory.promptSummary,
             history: conversationHistory,
-            previousInteractionID: previousInteractionID
+            previousInteractionID: previousInteractionID,
+            onSpeakReady: { [weak self] text in
+                guard let self, self.turnGeneration == gen, !Task.isCancelled else { return }
+                let clean = Self.speakable(text)
+                guard !clean.isEmpty else { return }
+                self.earlySpokenGeneration = gen
+                self.earlySpokenText = text
+                self.say(text)
+            }
         )
 
         guard !Task.isCancelled, gen == turnGeneration else {
@@ -380,7 +398,9 @@ final class Coordinator {
         let priorContext = clarifyContext
         clarifyContext = nil
         AppLog.write("transcript=\"\(transcript)\" → \(action)")
-        await perform(action, transcript: priorContext.map { "\($0) / \(transcript)" } ?? transcript)
+        let finalTranscript = priorContext.map { "\($0) / \(transcript)" } ?? transcript
+        let preSpoken = (earlySpokenGeneration == gen && !earlySpokenText.isEmpty) ? earlySpokenText : nil
+        await perform(action, transcript: finalTranscript, preSpokenText: preSpoken)
         // Re-arm the dialogue immediately. TTS still has priority; when it finishes refreshWake enters conversation mode.
         conversationUntil = Date().addingTimeInterval(60)
         refreshWake()
@@ -425,7 +445,7 @@ final class Coordinator {
         return t.replacingOccurrences(of: #"\s{2,}"#, with: " ", options: .regularExpression).trimmingCharacters(in: .whitespaces)
     }
 
-    func perform(_ raw: OrchestratorAction, transcript: String) async {
+    func perform(_ raw: OrchestratorAction, transcript: String, preSpokenText: String? = nil) async {
         let a = Self.sanitize(raw, transcript: transcript)
         // Memory side-effects happen regardless of which action was chosen.
         if let f = a.forget, !f.isEmpty { let n = memory.forget(f); if n == 0 && a.action == .chitchat { say("Non avevo niente di simile in memoria."); memory.record(heard: transcript, said: "niente da dimenticare", action: "forget"); return } }
@@ -494,7 +514,8 @@ final class Coordinator {
             }
         }
         memory.record(heard: transcript, said: speak, action: a.action.rawValue, task: a.task, project: a.project)
-        say(speak)
+        let alreadySpoken = preSpokenText.map { Self.speakable($0) == Self.speakable(speak) } ?? false
+        if !alreadySpoken { say(speak) }
     }
 
     /// Workspace for non-project requests ("riassumimi le mail", "cosa ho in calendario"). Best is a knowledge base
