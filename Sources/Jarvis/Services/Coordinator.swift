@@ -596,11 +596,13 @@ final class Coordinator {
             NSWorkspace.shared.open(url)
             opened = url.isFileURL ? url.lastPathComponent : url.absoluteString
         }
-        guard !wasCancelled, settings.settings.speakSummaries, let claudePath else { return }
+        guard !wasCancelled, settings.settings.speakSummaries, let key = Secrets.get(Secrets.geminiKey) else { return }
         let result = s.resultText.isEmpty ? lastText : s.resultText
+        let model = settings.settings.geminiModel
         Task {
-            let summary = await Orchestrator(claudePath: claudePath, language: settings.settings.replyLanguage).summarize(task: s.task, project: s.projectName, result: result,
-                                                                              isError: s.status != .done, exitCode: code, opened: opened)
+            let gemini = GeminiAPI(apiKey: key, model: model)
+            let summary = await Orchestrator(gemini: gemini, language: settings.settings.replyLanguage).summarize(task: s.task, project: s.projectName, result: result,
+                                                                                  isError: s.status != .done, exitCode: code, opened: opened)
             announce(summary)
         }
     }
