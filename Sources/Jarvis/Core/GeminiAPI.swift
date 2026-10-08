@@ -31,6 +31,11 @@ struct GeminiAPI: Sendable {
     let apiKey: String
     let model: String
 
+    struct InteractionResult: Sendable {
+        let json: [String: Any]
+        let interactionID: String
+    }
+
     /// Primary model first, followed by stable fallback models.
     private var candidateModels: [String] {
         var models = [model, "gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash"]
@@ -41,8 +46,9 @@ struct GeminiAPI: Sendable {
     func generateJSON(
         systemInstruction: String,
         prompt: String,
-        schema: [String: Any]? = nil
-    ) async throws -> [String: Any] {
+        schema: [String: Any]? = nil,
+        previousInteractionID: String? = nil
+    ) async throws -> InteractionResult {
         guard !apiKey.isEmpty else { throw GeminiError.missingKey }
 
         var lastError: Error?
@@ -53,7 +59,8 @@ struct GeminiAPI: Sendable {
                         model: candidate,
                         systemInstruction: systemInstruction,
                         prompt: prompt,
-                        schema: schema
+                        schema: schema,
+                        previousInteractionID: previousInteractionID
                     )
                 } catch {
                     lastError = error
@@ -83,14 +90,18 @@ struct GeminiAPI: Sendable {
         model: String,
         systemInstruction: String,
         prompt: String,
-        schema: [String: Any]?
-    ) async throws -> [String: Any] {
+        schema: [String: Any]?,
+        previousInteractionID: String?
+    ) async throws -> InteractionResult {
         var body: [String: Any] = [
             "model": model,
             "input": prompt,
-            "system_instruction": systemInstruction,
-            "store": false
+            "system_instruction": systemInstruction
         ]
+
+        if let previousInteractionID {
+            body["previous_interaction_id"] = previousInteractionID
+        }
 
         if let schema {
             body["response_format"] = [
@@ -147,7 +158,11 @@ struct GeminiAPI: Sendable {
             throw GeminiError.invalidResponse
         }
 
-        return json
+        guard let interactionID = root["id"] as? String, !interactionID.isEmpty else {
+            throw GeminiError.invalidResponse
+        }
+
+        return InteractionResult(json: json, interactionID: interactionID)
     }
 
     private static func extractOutputText(from root: [String: Any]) -> String {
