@@ -47,7 +47,7 @@ struct GeminiAPI: Sendable {
         ]
 
         let data = try JSONSerialization.data(withJSONObject: body)
-        guard let url = URL(string: "https://generativelanguage.googleapis.com/v1beta/models/\(model):generateContent?key=\(apiKey)") else {
+        guard let url = URL(string: "https://generativelanguage.googleapis.com/v1beta/models/\(model):generateContent") else {
             throw GeminiError.invalidResponse
         }
 
@@ -55,6 +55,7 @@ struct GeminiAPI: Sendable {
         request.httpMethod = "POST"
         request.timeoutInterval = 45
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(apiKey, forHTTPHeaderField: "x-goog-api-key")
         request.httpBody = data
 
         let (responseData, response) = try await URLSession.shared.data(for: request)
