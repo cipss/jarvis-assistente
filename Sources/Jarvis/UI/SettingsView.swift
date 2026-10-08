@@ -5,17 +5,30 @@ import ServiceManagement
 /// §5.4 — one compact window, tabs: Generale · Agenti · Voce · Progetti · Memoria.
 struct SettingsView: View {
     @Bindable var coordinator: Coordinator
+    var initialTab: SettingsTab = .general
+    @State private var selectedTab: SettingsTab
+
+    init(coordinator: Coordinator, initialTab: SettingsTab = .general) {
+        self.coordinator = coordinator
+        self.initialTab = initialTab
+        _selectedTab = State(initialValue: initialTab)
+    }
+
     var body: some View {
-        TabView {
-            GeneralTab(coordinator: coordinator).tabItem { Label("Generale", systemImage: "slider.horizontal.3") }
-            GeminiTab(coordinator: coordinator).tabItem { Label("Gemini", systemImage: "sparkles") }
-            AgentsTab(coordinator: coordinator).tabItem { Label("Agenti", systemImage: "terminal") }
-            VoiceTab(coordinator: coordinator).tabItem { Label("Voce", systemImage: "waveform") }
-            ProjectsTab(registry: coordinator.registry, settings: coordinator.settings).tabItem { Label("Progetti", systemImage: "folder") }
-            MemoryTab(memory: coordinator.memory).tabItem { Label("Memoria", systemImage: "brain") }
+        TabView(selection: $selectedTab) {
+            GeneralTab(coordinator: coordinator).tabItem { Label("Generale", systemImage: "slider.horizontal.3") }.tag(SettingsTab.general)
+            GeminiTab(coordinator: coordinator).tabItem { Label("Gemini", systemImage: "sparkles") }.tag(SettingsTab.gemini)
+            AgentsTab(coordinator: coordinator).tabItem { Label("Agenti", systemImage: "terminal") }.tag(SettingsTab.agents)
+            VoiceTab(coordinator: coordinator).tabItem { Label("Voce", systemImage: "waveform") }.tag(SettingsTab.voice)
+            ProjectsTab(registry: coordinator.registry, settings: coordinator.settings).tabItem { Label("Progetti", systemImage: "folder") }.tag(SettingsTab.projects)
+            MemoryTab(memory: coordinator.memory).tabItem { Label("Memoria", systemImage: "brain") }.tag(SettingsTab.memory)
         }
         .frame(width: 580, height: 480)
     }
+}
+
+enum SettingsTab: Hashable {
+    case general, gemini, agents, voice, projects, memory
 }
 
 struct GeneralTab: View {
