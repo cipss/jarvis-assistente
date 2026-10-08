@@ -130,7 +130,7 @@ final class SpeechService {
         return a + " " + b
     }
 
-    /// Stop capturing and wait (briefly) for the final transcript.
+    /// Stop capturing and wait only briefly for Apple's final transcript.\n    /// The live partial is already usable, so this guard is intentionally sub-second.
     func stop() async -> String {
         guard isListening else { return transcript }
         isListening = false
@@ -139,7 +139,7 @@ final class SpeechService {
         request?.endAudio()
         let text = await withCheckedContinuation { (c: CheckedContinuation<String, Never>) in
             finalContinuation = c
-            // Never wait more than 1.2 s for the recognizer to finalise.
+            // Never wait more than 350 ms for the recognizer to finalise; partial text is already accumulated.
             Task { @MainActor [weak self] in
                 try? await Task.sleep(for: .milliseconds(1200))
                 self?.deliverFinal()
