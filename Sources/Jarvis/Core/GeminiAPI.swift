@@ -151,14 +151,30 @@ struct GeminiAPI: Sendable {
     }
 
     private static func extractOutputText(from root: [String: Any]) -> String {
-        guard let output = root["output"] as? [[String: Any]] else { return "" }
-        return output.compactMap { item in
-            if let text = item["text"] as? String { return text }
-            if let content = item["content"] as? [[String: Any]] {
-                return content.compactMap { $0["text"] as? String }.joined()
-            }
-            return nil
-        }.joined()
+        // REST Interactions responses expose model output in:
+        // steps[] -> { type: "model_output", content: [{ type: "text", text: "..." }] }
+        if let steps = root["steps"] as? [[String: Any]] {
+            return steps.compactMap { step in
+                guard let content = step["content"] as? [[String: Any]] else { return nil }
+                return content.compactMap { item -> String? in
+                    guard item["type"] as? String == "text" else { return nil }
+                    return item["text"] as? String
+                }.joined()
+            }.joined()
+        }
+
+        // Keep compatibility with SDK-like responses that may expose output directly.
+        if let output = root["output"] as? [[String: Any]] {
+            return output.compactMap { item in
+                if let text = item["text"] as? String { return text }
+                if let content = item["content"] as? [[String: Any]] {
+                    return content.compactMap { $0["text"] as? String }.joined()
+                }
+                return nil
+            }.joined()
+        }
+
+        return ""
     }
 
     /// Performs a real inference call, not just a model metadata lookup.
