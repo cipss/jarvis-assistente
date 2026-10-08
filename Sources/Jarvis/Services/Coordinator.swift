@@ -323,6 +323,9 @@ final class Coordinator {
         }
 
         let previousInteractionID = geminiInteractionID
+        let conversationHistory = previousInteractionID == nil
+            ? memory.turnsSummary
+            : "- Conversazione precedente mantenuta da Gemini sul server."
         let gemini = GeminiAPI(apiKey: geminiKey, model: model)
         let orch = Orchestrator(gemini: gemini, language: settings.settings.replyLanguage)
         let decision = await orch.decide(
@@ -333,7 +336,7 @@ final class Coordinator {
             runningCount: sessions.running.count,
             context: clarifyContext,
             memories: memory.promptSummary,
-            history: memory.turnsSummary,
+            history: conversationHistory,
             previousInteractionID: previousInteractionID
         )
 
