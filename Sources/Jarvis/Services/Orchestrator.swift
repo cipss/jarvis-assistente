@@ -3,7 +3,7 @@ import Foundation
 /// Gemini is Jarvis's primary reasoning/orchestration brain.
 /// Claude Code and Codex remain execution agents.
 struct Orchestrator: Sendable {
-    let gemini: GeminiAPI
+    let gemini: GeminiAPI?
     let brain: FastBrainRouter
     var language: String = "Italian"
 
@@ -223,7 +223,8 @@ struct Orchestrator: Sendable {
         Do not invent details.
         """
 
-        if let result = try? await gemini.generateJSON(
+        if let gemini,
+           let result = try? await gemini.generateJSON(
             systemInstruction: system,
             prompt: prompt,
             schema: schema
