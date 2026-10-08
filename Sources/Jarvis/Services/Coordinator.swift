@@ -70,6 +70,7 @@ final class Coordinator {
         sessions.clearFinished()
         memory.clearTurns()
         clarifyContext = nil
+        geminiInteractionID = nil
         AppLog.write("history cleared")
     }
     var onOverlayToggle: (() -> Void)?
