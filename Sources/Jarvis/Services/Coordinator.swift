@@ -33,6 +33,8 @@ final class Coordinator {
     let wake = WakeService()
     private var wakeConfig = ""
     private var askedWakePermissions = false
+    /// Keeps the no-wake-word conversation window alive after each answer.
+    private var conversationUntil: Date?
 
     var onPillChanged: (() -> Void)?
 
@@ -61,6 +63,7 @@ final class Coordinator {
         hideTask?.cancel()
         clarifyContext = nil
         geminiInteractionID = nil
+        conversationUntil = nil
         memory.record(heard: "(ha premuto Esc: scambio annullato)", said: "", action: "cancelled", task: nil)
         pill.visible = false; pill.secondary = ""; pill.transcript = ""; pill.state = .listening
         pillDidChange()
@@ -72,6 +75,7 @@ final class Coordinator {
         memory.clearTurns()
         clarifyContext = nil
         geminiInteractionID = nil
+        conversationUntil = nil
         AppLog.write("history cleared")
     }
     var onOverlayToggle: (() -> Void)?
@@ -167,7 +171,16 @@ final class Coordinator {
         }
         wake.clapEnabled = s.wakeOnClap
         let thinking = pill.visible && pill.state == .thinking
-        wake.setMode(thinking ? .busy : voice.isSpeaking ? .speaking : .idle)
+        if thinking {
+            wake.setMode(.busy)
+        } else if voice.isSpeaking {
+            wake.setMode(.speaking)
+        } else if let until = conversationUntil, until > Date() {
+            wake.setMode(.conversation)
+        } else {
+            conversationUntil = nil
+            wake.setMode(.idle)
+        }
     }
 
     // MARK: Progress updates
@@ -368,6 +381,9 @@ final class Coordinator {
         clarifyContext = nil
         AppLog.write("transcript=\"\(transcript)\" → \(action)")
         await perform(action, transcript: priorContext.map { "\($0) / \(transcript)" } ?? transcript)
+        // Re-arm the dialogue immediately. TTS still has priority; when it finishes refreshWake enters conversation mode.
+        conversationUntil = Date().addingTimeInterval(15)
+        refreshWake()
     }
 
     /// Haiku sometimes routes "open it on localhost / in the browser" to `open`, which pops a Terminal window.
