@@ -95,7 +95,7 @@ struct FastBrainRouter: Sendable {
 
         let selected = Array(specs.prefix(maxParallel))
 
-        return await withTaskGroup(of: CandidateResult?.self) { group in
+        let winner = await withTaskGroup(of: CandidateResult?.self) { group in
             for spec in selected {
                 group.addTask {
                     let t = Date()
@@ -123,7 +123,10 @@ struct FastBrainRouter: Sendable {
                 return item.result
             }
             return nil
-        } ?? { throw RouterError.noProvider }()
+        }
+
+        guard let winner else { throw RouterError.noProvider }
+        return winner
     }
 
     private func candidateSpecs(prompt: String) -> [ProviderSpec] {
