@@ -186,21 +186,14 @@ struct GeminiTab: View {
             return
         }
         status = "Test in corso…"
-        let schema: [String: Any] = [
-            "type": "object",
-            "properties": ["ok": ["type": "boolean"]],
-            "required": ["ok"]
-        ]
         do {
-            let json = try await GeminiAPI(apiKey: key, model: coordinator.settings.settings.geminiModel)
-                .generateJSON(
-                    systemInstruction: "Rispondi con un JSON contenente solo ok=true.",
-                    prompt: "Test di connessione. Restituisci ok=true.",
-                    schema: schema
-                )
-            status = (json["ok"] as? Bool) == true ? "Gemini raggiungibile e funzionante." : "Gemini ha risposto, ma il test JSON non è valido."
+            let model = try await GeminiAPI(
+                apiKey: key,
+                model: coordinator.settings.settings.geminiModel
+            ).testConnection()
+            status = "Gemini raggiungibile. Modello: \(model)"
         } catch {
-            status = "Errore Gemini: (error.localizedDescription)"
+            status = "Errore Gemini: \(error.localizedDescription)"
         }
     }
 
