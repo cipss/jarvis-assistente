@@ -330,7 +330,7 @@ final class Coordinator {
         }
         let priorContext = clarifyContext
         clarifyContext = nil
-        AppLog.write("transcript=\\"\(transcript)\\" → \(action)")
+        AppLog.write("transcript=\"\(transcript)\" → \(action)")
         await perform(action, transcript: priorContext.map { "\($0) / \(transcript)" } ?? transcript)
     }
 
