@@ -86,21 +86,19 @@ final class SessionStore {
         JSONStore.save(sessions, to: AppPaths.sessions)
     }
 
-    /// Summary block for the orchestrator prompt (§4.1).
+    /// Compact summary for the orchestrator prompt: keep voice turns small and fast.
     var promptSummary: String {
-        // Sessions closed from the panel are gone for Jarvis too: it no longer answers from them or continues them.
-        let recent = sessions.filter { !$0.dismissed }.prefix(8)
-        return recent.isEmpty ? "- (none)" :
-        recent.map { s in
-            var line = "- \(s.id) · \(s.projectName) · \(s.agent.rawValue) · \(s.status.rawValue) · \"\(s.task.prefix(60))\" · \(Self.format(s.elapsed))"
-            if s.status == .running, !s.activity.isEmpty { line += " · now: \(s.activity.prefix(60))" }
+        let recent = sessions.filter { !$0.dismissed }.prefix(4)
+        guard !recent.isEmpty else { return "- (none)" }
+        return recent.map { s in
+            var line = "- \(s.id) · \(s.projectName) · \(s.agent.rawValue) · \(s.status.rawValue) · \"\(s.task.prefix(60))\""
+            if s.status == .running, !s.activity.isEmpty {
+                line += " · now: \(s.activity.prefix(60))"
+            }
             if let end = s.finishedAt {
-                line += " · finished \(Int(Date().timeIntervalSince(end) / 60)) min ago"
-                // The result itself, so a question it already answered gets answered now, without reopening the session.
+                line += " · finished \(Int(Date().timeIntervalSince(end) / 60))m ago"
                 let r = s.resultText.replacingOccurrences(of: "\n", with: " ").trimmingCharacters(in: .whitespaces)
-                // Fresh results whole (a mail summary cut at 700 chars lost the third mail, 29/09), older ones short.
-                let fresh = Date().timeIntervalSince(end) < 30 * 60
-                if !r.isEmpty { line += " · result: \"\(r.prefix(fresh ? 2500 : 300))\"" }
+                if !r.isEmpty { line += " · result: \"\(r.prefix(800))\"" }
             }
             return line
         }.joined(separator: "\n")
@@ -171,18 +169,20 @@ final class MemoryStore {
 
     /// Block for the orchestrator prompt.
     var promptSummary: String {
-        memories.isEmpty ? "- (nothing saved yet)" : memories.map { "- \($0.text)" }.joined(separator: "\n")
+        guard !memories.isEmpty else { return "- (nothing saved yet)" }
+        let lines = memories.suffix(24).map { "- \($0.text)" }.joined(separator: "\n")
+        return String(lines.prefix(5000))
     }
 
+    /// Recent exchanges, oldest first, for the orchestrator prompt.
     /// Recent exchanges, oldest first, for the orchestrator prompt.
     var turnsSummary: String {
         guard !turns.isEmpty else { return "- (none)" }
         let f = RelativeDateTimeFormatter(); f.unitsStyle = .abbreviated
-        return turns.map { t in
-            var line = "- [\(f.localizedString(for: t.at, relativeTo: Date()))] heard: \"\(t.heard)\" → \(t.action)"
+        return turns.suffix(6).map { t in
+            var line = "- [\(f.localizedString(for: t.at, relativeTo: Date()))] heard: \"\(t.heard.prefix(180))\" → \(t.action)"
             if let p = t.project, !p.isEmpty { line += " project=\"\(p)\"" }
-            if let k = t.task, !k.isEmpty { line += " task=\"\(k)\"" }
-            if !t.said.isEmpty { line += " · said: \"\(t.said)\"" }
+            if !t.said.isEmpty { line += " · said: \"\(t.said.prefix(180))\"" }
             return line
         }.joined(separator: "\n")
     }

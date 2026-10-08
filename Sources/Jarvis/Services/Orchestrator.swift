@@ -19,7 +19,11 @@ struct Orchestrator: Sendable {
     static let systemPrompt = """
     You are Jarvis, a friendly voice assistant and work partner for one developer.
     Return exactly ONE JSON object and nothing else. Never run tools yourself.
-    "speak" is read aloud, so keep it concise and natural.
+    "speak" is read aloud. Emit "speak" first when possible and keep it to 18 words or fewer.
+    "speak" must be safe to play immediately:
+    - chitchat: the actual concise answer.
+    - spawn/followup/cancel/status/open/create: a brief acknowledgement, never a claim that the action already succeeded.
+    - clarify: the one short clarification question.
 
     The architecture is:
     - Gemini = reasoning/orchestration brain.
@@ -57,6 +61,7 @@ struct Orchestrator: Sendable {
             "type": "object",
             "additionalProperties": false,
             "properties": [
+                "speak": ["type": "string"],
                 "action": [
                     "type": "string",
                     "enum": ["spawn","followup","cancel","status","open","clarify","chitchat","create"]
@@ -68,12 +73,11 @@ struct Orchestrator: Sendable {
                 "project": ["type": "string"],
                 "session_id": ["type": "string"],
                 "task": ["type": "string"],
-                "speak": ["type": "string"],
                 "remember": ["type": "string"],
                 "forget": ["type": "string"],
                 "coding": ["type": "boolean"]
             ],
-            "required": ["action","speak"]
+            "required": ["speak","action"]
         ]
     }
     static func userPrompt(
@@ -124,7 +128,8 @@ struct Orchestrator: Sendable {
         context: String?,
         memories: String = "- (nothing saved yet)",
         history: String = "- (none)",
-        previousInteractionID: String? = nil
+        previousInteractionID: String? = nil,
+        onSpeakReady: (@MainActor @Sendable (String) -> Void)? = nil
     ) async -> DecisionResult {
         let prompt = Self.userPrompt(
             projects: projects,
@@ -142,7 +147,12 @@ struct Orchestrator: Sendable {
                 systemInstruction: Self.systemPrompt + Self.languageRule(language),
                 prompt: prompt,
                 schema: Self.jsonSchema(),
-                previousInteractionID: previousInteractionID
+                previousInteractionID: previousInteractionID,
+                onSpeakReady: onSpeakReady.map { callback in
+                    { text in
+                        Task { @MainActor in callback(text) }
+                    }
+                }
             )
             if let action = try? JSONDecoder().decode(OrchestratorAction.self, from: result.jsonData) {
                 return DecisionResult(action: action, interactionID: result.interactionID)

@@ -139,9 +139,9 @@ final class SpeechService {
         request?.endAudio()
         let text = await withCheckedContinuation { (c: CheckedContinuation<String, Never>) in
             finalContinuation = c
-            // Never wait more than 350 ms for the recognizer to finalise; partial text is already accumulated.
+            // Partial text is already accumulated; only give Apple's recognizer a tiny finalisation window.
             Task { @MainActor [weak self] in
-                try? await Task.sleep(for: .milliseconds(1200))
+                try? await Task.sleep(for: .milliseconds(250))
                 self?.deliverFinal()
             }
         }

@@ -47,8 +47,8 @@ struct GeminiAPI: Sendable {
     private static let session: URLSession = {
         let configuration = URLSessionConfiguration.default
         configuration.waitsForConnectivity = false
-        configuration.timeoutIntervalForRequest = 20
-        configuration.timeoutIntervalForResource = 45
+        configuration.timeoutIntervalForRequest = 12
+        configuration.timeoutIntervalForResource = 20
         configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
         configuration.httpMaximumConnectionsPerHost = 4
         return URLSession(configuration: configuration)
@@ -56,16 +56,21 @@ struct GeminiAPI: Sendable {
 
     /// Primary model first, followed by stable fallback models.
     private var candidateModels: [String] {
-        let models = [model, "gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash"]
+        let models = [model, "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"]
         var seen = Set<String>()
         return models.filter { seen.insert($0).inserted }
+    }
+
+    private static func thinkingLevel(for model: String) -> String {
+        (model == "gemini-3.5-flash-lite" || model == "gemini-3.1-flash-lite") ? "minimal" : "low"
     }
 
     func generateJSON(
         systemInstruction: String,
         prompt: String,
         schema: [String: Any]? = nil,
-        previousInteractionID: String? = nil
+        previousInteractionID: String? = nil,
+        onSpeakReady: (@Sendable (String) -> Void)? = nil
     ) async throws -> InteractionResult {
         guard !apiKey.isEmpty else { throw GeminiError.missingKey }
 
@@ -78,7 +83,8 @@ struct GeminiAPI: Sendable {
                         systemInstruction: systemInstruction,
                         prompt: prompt,
                         schema: schema,
-                        previousInteractionID: previousInteractionID
+                        previousInteractionID: previousInteractionID,
+                        onSpeakReady: onSpeakReady
                     )
                 } catch {
                     lastError = error
@@ -109,13 +115,29 @@ struct GeminiAPI: Sendable {
         systemInstruction: String,
         prompt: String,
         schema: [String: Any]?,
-        previousInteractionID: String?
+        previousInteractionID: String?,
+        onSpeakReady: (@Sendable (String) -> Void)?
     ) async throws -> InteractionResult {
+        if let onSpeakReady {
+            return try await requestStreamingJSON(
+                model: model,
+                systemInstruction: systemInstruction,
+                prompt: prompt,
+                schema: schema,
+                previousInteractionID: previousInteractionID,
+                onSpeakReady: onSpeakReady
+            )
+        }
+
         var body: [String: Any] = [
             "model": model,
             "input": prompt,
             "system_instruction": systemInstruction,
-            "generation_config": ["thinking_level": "low", "thinking_summaries": "none"]
+            "generation_config": [
+                "thinking_level": Self.thinkingLevel(for: model),
+                "thinking_summaries": "none",
+                "max_output_tokens": 384
+            ]
         ]
 
         if let previousInteractionID {
@@ -142,7 +164,7 @@ struct GeminiAPI: Sendable {
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        request.timeoutInterval = 20
+        request.timeoutInterval = 12
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(apiKey, forHTTPHeaderField: "x-goog-api-key")
         request.httpBody = data
@@ -183,6 +205,160 @@ struct GeminiAPI: Sendable {
 
         let resultJSONData = try JSONSerialization.data(withJSONObject: json)
         return InteractionResult(jsonData: resultJSONData, interactionID: interactionID)
+    }
+
+    /// Stream Gemini's model output and surface the "speak" field as soon as the JSON
+    /// contains both action and speak. The UI can start TTS before the complete object arrives.
+    private func requestStreamingJSON(
+        model: String,
+        systemInstruction: String,
+        prompt: String,
+        schema: [String: Any]?,
+        previousInteractionID: String?,
+        onSpeakReady: @Sendable (String) -> Void
+    ) async throws -> InteractionResult {
+        var body: [String: Any] = [
+            "model": model,
+            "input": prompt,
+            "system_instruction": systemInstruction,
+            "stream": true,
+            "generation_config": [
+                "thinking_level": Self.thinkingLevel(for: model),
+                "thinking_summaries": "none",
+                "max_output_tokens": 384
+            ]
+        ]
+
+        if let previousInteractionID {
+            body["previous_interaction_id"] = previousInteractionID
+        }
+
+        if let schema {
+            body["response_format"] = [
+                "type": "text",
+                "mime_type": "application/json",
+                "schema": schema
+            ]
+        } else {
+            body["response_format"] = [
+                "type": "text",
+                "mime_type": "application/json"
+            ]
+        }
+
+        let data = try JSONSerialization.data(withJSONObject: body)
+        guard let url = URL(string: "https://generativelanguage.googleapis.com/v1beta/interactions") else {
+            throw GeminiError.invalidResponse
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 12
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+        request.setValue(apiKey, forHTTPHeaderField: "x-goog-api-key")
+        request.httpBody = data
+
+        let (bytes, response) = try await Self.session.bytes(for: request)
+        guard let http = response as? HTTPURLResponse else {
+            throw GeminiError.invalidResponse
+        }
+
+        guard (200..<300).contains(http.statusCode) else {
+            var errorBody = ""
+            for try await line in bytes.lines {
+                errorBody += line + "\n"
+                if errorBody.count > 1800 { break }
+            }
+            throw GeminiError.http(http.statusCode, "(model): " + String(errorBody.prefix(1800)))
+        }
+
+        var output = ""
+        var interactionID: String?
+        var spoke = false
+
+        for try await line in bytes.lines {
+            guard line.hasPrefix("data: ") else { continue }
+            let payload = String(line.dropFirst(6))
+            guard payload != "[DONE]",
+                  let eventData = payload.data(using: .utf8),
+                  let event = try? JSONSerialization.jsonObject(with: eventData) as? [String: Any] else { continue }
+
+            if let interaction = event["interaction"] as? [String: Any],
+               let id = interaction["id"] as? String, !id.isEmpty {
+                interactionID = id
+            }
+            if let id = event["id"] as? String, !id.isEmpty, interactionID == nil {
+                interactionID = id
+            }
+
+            let eventType = event["event_type"] as? String ?? ""
+            guard eventType == "step.delta",
+                  let delta = event["delta"] as? [String: Any],
+                  delta["type"] as? String == "text",
+                  let chunk = delta["text"] as? String else { continue }
+
+            output += chunk
+
+            if !spoke,
+               let action = Self.extractJSONStringValue(in: output, key: "action"),
+               action != "clarify",
+               let speak = Self.extractJSONStringValue(in: output, key: "speak"),
+               !speak.isEmpty {
+                spoke = true
+                onSpeakReady(speak)
+            }
+        }
+
+        let text = output.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty, let interactionID, !interactionID.isEmpty else {
+            throw GeminiError.emptyResponse
+        }
+
+        let cleaned: String
+        if let start = text.firstIndex(of: "{"), let end = text.lastIndex(of: "}") {
+            cleaned = String(text[start...end])
+        } else {
+            cleaned = text
+        }
+
+        guard let rawJSONData = cleaned.data(using: .utf8),
+              let json = try JSONSerialization.jsonObject(with: rawJSONData) as? [String: Any] else {
+            throw GeminiError.invalidResponse
+        }
+
+        let resultJSONData = try JSONSerialization.data(withJSONObject: json)
+        return InteractionResult(jsonData: resultJSONData, interactionID: interactionID)
+    }
+
+    private static func extractJSONStringValue(in text: String, key: String) -> String? {
+        guard let keyRange = text.range(of: "\"\(key)\""),
+              let colon = text[keyRange.upperBound...].firstIndex(of: ":") else { return nil }
+
+        var i = text.index(after: colon)
+        while i < text.endIndex, text[i].isWhitespace {
+            i = text.index(after: i)
+        }
+        guard i < text.endIndex, text[i] == "\"" else { return nil }
+
+        i = text.index(after: i)
+        var escaped = false
+        var encoded = "\""
+        while i < text.endIndex {
+            let ch = text[i]
+            encoded.append(ch)
+            if escaped {
+                escaped = false
+            } else if ch == "\\" {
+                escaped = true
+            } else if ch == "\"" {
+                guard let data = encoded.data(using: .utf8),
+                      let value = try? JSONSerialization.jsonObject(with: data) as? String else { return nil }
+                return value
+            }
+            i = text.index(after: i)
+        }
+        return nil
     }
 
     private static func extractOutputText(from root: [String: Any]) -> String {
