@@ -94,35 +94,36 @@ struct FastBrainRouter: Sendable {
         guard !specs.isEmpty else { throw RouterError.noProvider }
 
         let selected = Array(specs.prefix(maxParallel))
-        let started = Date()
 
-        return try await withThrowingTaskGroup(of: CandidateResult.self) { group in
+        return await withTaskGroup(of: CandidateResult?.self) { group in
             for spec in selected {
                 group.addTask {
                     let t = Date()
-                    let result = try await self.request(
-                        spec: spec,
-                        systemInstruction: systemInstruction,
-                        prompt: prompt,
-                        schema: schema,
-                        previousGeminiInteractionID: previousGeminiInteractionID
-                    )
-                    return CandidateResult(result: result, latency: Date().timeIntervalSince(t))
+                    do {
+                        let result = try await self.request(
+                            spec: spec,
+                            systemInstruction: systemInstruction,
+                            prompt: prompt,
+                            schema: schema,
+                            previousGeminiInteractionID: previousGeminiInteractionID
+                        )
+                        return CandidateResult(result: result, latency: Date().timeIntervalSince(t))
+                    } catch {
+                        AppLog.write("brain provider=\(spec.provider.rawValue) failed: \(error.localizedDescription)")
+                        return nil
+                    }
                 }
             }
 
-            var lastError: Error?
-            while let item = try await group.next() {
+            while let item = await group.next() {
+                guard let item else { continue }
                 await BrainLatencyBook.shared.record(provider: item.result.provider, seconds: item.latency)
                 AppLog.write("brain winner=\(item.result.provider.rawValue) latency=\(Int(item.latency * 1000))ms")
                 group.cancelAll()
                 return item.result
             }
-
-            _ = started
-            if let lastError { throw lastError }
-            throw RouterError.noProvider
-        }
+            return nil
+        } ?? { throw RouterError.noProvider }()
     }
 
     private func candidateSpecs(prompt: String) -> [ProviderSpec] {
@@ -303,7 +304,7 @@ struct FastBrainRouter: Sendable {
         request.httpMethod = "POST"
         request.timeoutInterval = 8
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
         request.setValue(key, forHTTPHeaderField: "x-api-key")
         request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
