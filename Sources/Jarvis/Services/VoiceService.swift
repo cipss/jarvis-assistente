@@ -80,12 +80,13 @@ final class VoiceService: NSObject, AVAudioPlayerDelegate, AVSpeechSynthesizerDe
             if let key = Secrets.get(Secrets.fishKey) {
                 do {
                     let pref = settings.settings.fishModel
-                    var model = pref == "auto" ? (proUnavailable ? FishAudio.freeModel : FishAudio.model) : pref
+                    // Auto uses the no-credit S2.1 Pro endpoint directly, avoiding a slow 402 fallback round-trip.
+                    var model = pref == "auto" ? FishAudio.freeModel : pref
                     var data: Data
                     do {
                         data = try await FishAudio.synthesize(text: text, apiKey: key, voiceID: settings.settings.fishVoiceID, speed: settings.settings.speakingRate, model: model)
                     } catch let e as FishAudio.APIError where e.status == 402 && pref == "auto" && model != FishAudio.freeModel {
-                        AppLog.write("fish: no API credit for \(model) → using \(FishAudio.freeModel)")
+                        AppLog.write("fish: paid endpoint unavailable → using \(FishAudio.freeModel)")
                         proUnavailable = true; model = FishAudio.freeModel
                         data = try await FishAudio.synthesize(text: text, apiKey: key, voiceID: settings.settings.fishVoiceID, speed: settings.settings.speakingRate, model: model)
                     }
