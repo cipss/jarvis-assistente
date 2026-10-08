@@ -150,7 +150,7 @@ enum FishAudio {
     static let base = URL(string: "https://api.fish.audio")!
 
     /// Own session: short timeouts so a dead socket fails fast instead of leaving the user waiting.
-    nonisolated(unsafe) static let session: URLSession = {
+    static let session: URLSession = {
         let configuration = URLSessionConfiguration.default
         configuration.timeoutIntervalForRequest = 12
         configuration.timeoutIntervalForResource = 20
