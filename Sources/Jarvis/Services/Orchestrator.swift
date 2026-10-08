@@ -144,13 +144,19 @@ struct Orchestrator: Sendable {
             AppLog.write("gemini orchestrator returned JSON that did not match the schema")
         } catch {
             AppLog.write("gemini orchestrator error: \(error.localizedDescription)")
+            let detail: String
+            if let geminiError = error as? GeminiAPI.GeminiError {
+                detail = geminiError.localizedDescription
+            } else {
+                detail = error.localizedDescription
+            }
             return OrchestratorAction(
                 action: .chitchat,
                 agent: nil,
                 project: nil,
                 sessionID: nil,
                 task: nil,
-                speak: "Non riesco a raggiungere Gemini in questo momento. Controlla la chiave API."
+                speak: "Gemini non ha risposto: \(detail)"
             )
         }
 
