@@ -92,6 +92,9 @@ struct GeminiTab: View {
     @State private var hasCerebrasKey = Secrets.get(Secrets.cerebrasKey) != nil
     @State private var anthropicField = ""
     @State private var hasAnthropicKey = Secrets.get(Secrets.anthropicKey) != nil
+    @State private var sheetsTokenField = ""
+    @State private var hasSheetsToken = Secrets.get(Secrets.googleSheetsToken) != nil
+    @State private var sheetsStatus = ""
     @State private var status = ""
 
     var body: some View {
@@ -209,6 +212,48 @@ struct GeminiTab: View {
                     .help("Quanti provider possono correre insieme nella corsia veloce.")
             }
 
+            Section("Google Sheets · esecuzione diretta con Gemini") {
+                Text("Le richieste sui fogli vengono pianificate da Gemini e applicate direttamente tramite Google Apps Script. Non richiedono il login di Claude Code o Codex.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                TextField("URL Web App Google Apps Script (/exec)", text: $s.settings.googleSheetsEndpoint)
+                    .textFieldStyle(.roundedBorder)
+                    .textContentType(.URL)
+
+                HStack(spacing: 8) {
+                    SecureField(hasSheetsToken ? "Token configurato" : "Token API_TOKEN", text: $sheetsTokenField)
+                        .textFieldStyle(.roundedBorder)
+                    Button(hasSheetsToken ? "Sostituisci" : "Salva") { saveSheetsToken() }
+                        .disabled(sheetsTokenField.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    if hasSheetsToken {
+                        Button("Rimuovi") {
+                            Secrets.delete(Secrets.googleSheetsToken)
+                            hasSheetsToken = false
+                            sheetsStatus = "Token rimosso."
+                        }
+                        .buttonStyle(.borderless)
+                    }
+                }
+
+                HStack {
+                    Spacer()
+                    Button {
+                        Task { await testGoogleSheets() }
+                    } label: {
+                        Label("Testa connessione", systemImage: "checkmark.icloud")
+                    }
+                    .disabled(s.settings.googleSheetsEndpoint.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !hasSheetsToken || !hasKey)
+                }
+
+                if !sheetsStatus.isEmpty {
+                    Text(sheetsStatus)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                }
+            }
+
             Section("Stato") {
                 LabeledContent("Cervello") {
                     Label("Gemini", systemImage: "sparkles")
@@ -268,6 +313,40 @@ struct GeminiTab: View {
 
     private func removeAnthropicKey() {
         Secrets.delete(Secrets.anthropicKey); hasAnthropicKey = false
+    }
+
+    private func saveSheetsToken() {
+        let token = sheetsTokenField.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !token.isEmpty else { return }
+        if Secrets.set(token, for: Secrets.googleSheetsToken) {
+            hasSheetsToken = true
+            sheetsTokenField = ""
+            sheetsStatus = "Token Google Sheets salvato localmente."
+        } else {
+            sheetsStatus = "Non riesco a salvare il token Google Sheets."
+        }
+    }
+
+    private func testGoogleSheets() async {
+        guard let key = Secrets.get(Secrets.geminiKey), !key.isEmpty else {
+            sheetsStatus = "Configura prima la chiave Gemini."
+            return
+        }
+        guard let token = Secrets.get(Secrets.googleSheetsToken), !token.isEmpty else {
+            sheetsStatus = "Salva il token configurato nelle Script Properties come API_TOKEN."
+            return
+        }
+        sheetsStatus = "Connessione in corso…"
+        do {
+            let bridge = GoogleSheetsBridge(
+                endpoint: coordinator.settings.settings.googleSheetsEndpoint,
+                token: token,
+                gemini: GeminiAPI(apiKey: key, model: coordinator.settings.settings.geminiModel)
+            )
+            sheetsStatus = try await bridge.testConnection()
+        } catch {
+            sheetsStatus = "Errore Google Sheets: \\(error.localizedDescription)"
+        }
     }
 
     private func saveKey() {
