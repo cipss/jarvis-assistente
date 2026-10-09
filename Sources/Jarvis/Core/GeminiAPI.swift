@@ -70,7 +70,8 @@ struct GeminiAPI: Sendable {
         prompt: String,
         schema: [String: Any]? = nil,
         previousInteractionID: String? = nil,
-        onSpeakReady: (@Sendable (String) -> Void)? = nil
+        onSpeakReady: (@Sendable (String) -> Void)? = nil,
+        maxOutputTokens: Int = 384
     ) async throws -> InteractionResult {
         guard !apiKey.isEmpty else { throw GeminiError.missingKey }
 
@@ -84,7 +85,8 @@ struct GeminiAPI: Sendable {
                         prompt: prompt,
                         schema: schema,
                         previousInteractionID: previousInteractionID,
-                        onSpeakReady: onSpeakReady
+                        onSpeakReady: onSpeakReady,
+                        maxOutputTokens: maxOutputTokens
                     )
                 } catch {
                     lastError = error
@@ -116,7 +118,8 @@ struct GeminiAPI: Sendable {
         prompt: String,
         schema: [String: Any]?,
         previousInteractionID: String?,
-        onSpeakReady: (@Sendable (String) -> Void)?
+        onSpeakReady: (@Sendable (String) -> Void)?,
+        maxOutputTokens: Int
     ) async throws -> InteractionResult {
         if let onSpeakReady {
             return try await requestStreamingJSON(
@@ -125,7 +128,8 @@ struct GeminiAPI: Sendable {
                 prompt: prompt,
                 schema: schema,
                 previousInteractionID: previousInteractionID,
-                onSpeakReady: onSpeakReady
+                onSpeakReady: onSpeakReady,
+                maxOutputTokens: maxOutputTokens
             )
         }
 
@@ -136,7 +140,7 @@ struct GeminiAPI: Sendable {
             "generation_config": [
                 "thinking_level": Self.thinkingLevel(for: model),
                 "thinking_summaries": "none",
-                "max_output_tokens": 384
+                "max_output_tokens": maxOutputTokens
             ]
         ]
 
@@ -215,7 +219,8 @@ struct GeminiAPI: Sendable {
         prompt: String,
         schema: [String: Any]?,
         previousInteractionID: String?,
-        onSpeakReady: @Sendable (String) -> Void
+        onSpeakReady: @Sendable (String) -> Void,
+        maxOutputTokens: Int
     ) async throws -> InteractionResult {
         var body: [String: Any] = [
             "model": model,
@@ -225,7 +230,7 @@ struct GeminiAPI: Sendable {
             "generation_config": [
                 "thinking_level": Self.thinkingLevel(for: model),
                 "thinking_summaries": "none",
-                "max_output_tokens": 384
+                "max_output_tokens": maxOutputTokens
             ]
         ]
 
