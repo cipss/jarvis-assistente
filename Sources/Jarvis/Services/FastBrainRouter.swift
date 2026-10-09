@@ -97,7 +97,7 @@ struct FastBrainRouter: Sendable {
 
         let selected = Array(specs.prefix(maxParallel))
 
-        let winner = await withTaskGroup(of: CandidateResult?.self) { group in
+        let winner: CandidateResult? = await withTaskGroup(of: CandidateResult?.self) { group -> CandidateResult? in
             for spec in selected {
                 group.addTask {
                     let t = Date()
@@ -122,13 +122,13 @@ struct FastBrainRouter: Sendable {
                 await BrainLatencyBook.shared.record(provider: item.result.provider, seconds: item.latency)
                 AppLog.write("brain winner=\(item.result.provider.rawValue) latency=\(Int(item.latency * 1000))ms")
                 group.cancelAll()
-                return item.result
+                return item
             }
             return nil
         }
 
         guard let winner else { throw RouterError.noProvider }
-        return winner
+        return winner.result
     }
 
     private func candidateSpecs(prompt: String) -> [ProviderSpec] {
@@ -146,7 +146,7 @@ struct FastBrainRouter: Sendable {
             !prompt.localizedCaseInsensitiveContains("spiegazione") &&
             !prompt.localizedCaseInsensitiveContains("architettura")
 
-        var order: [Provider] = simple
+        let order: [Provider] = simple
             ? [.cerebras, .groq, .gemini, .anthropic]
             : [.cerebras, .gemini, .anthropic, .groq]
 
