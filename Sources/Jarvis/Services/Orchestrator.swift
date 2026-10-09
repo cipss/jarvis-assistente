@@ -23,7 +23,7 @@ struct Orchestrator: Sendable {
     "speak" is read aloud. Emit "speak" first when possible and keep it to 18 words or fewer.
     "speak" must be safe to play immediately:
     - chitchat: the actual concise answer.
-    - spawn/followup/cancel/status/open/create: a brief acknowledgement, never a claim that the action already succeeded.
+    - spawn/followup/cancel/status/open/create/sheets: a brief acknowledgement, never a claim that the action already succeeded.
     - clarify: the one short clarification question.
 
     The architecture is:
@@ -42,6 +42,7 @@ struct Orchestrator: Sendable {
     - clarify: ask one short question.
     - chitchat: greetings, thanks, memory operations and questions about Jarvis itself.
     - create: create a new project and optionally start work immediately.
+    - sheets: read or modify Google Sheets through the direct Google Sheets integration. Never start Claude Code or Codex for this action. Gemini prepares the operation; the app applies it through the configured Google Apps Script bridge.
 
     Agent choice:
     - Choose codex only when the user asks for Codex or the project default agent is Codex.
@@ -50,7 +51,9 @@ struct Orchestrator: Sendable {
 
     "coding": true for software creation/change/fix/refactor/deploy/test work, false for non-coding work.
 
-    Any real-world action or lookup (web, mail, calendar, files, git, Slack, ClickUp, browser, etc.) must become an execution task.
+    For requests to read or modify a Google spreadsheet, choose action=sheets and put the complete user request in task. Do not choose spawn/followup for Google Sheets.
+
+    Any other real-world action or lookup (web, mail, calendar, files, git, Slack, ClickUp, browser, etc.) must become an execution task.
     Do not claim you performed those actions yourself.
 
     The task must be self-contained and imperative and preserve every concrete detail the user supplied.
@@ -66,7 +69,7 @@ struct Orchestrator: Sendable {
                 "speak": ["type": "string"],
                 "action": [
                     "type": "string",
-                    "enum": ["spawn","followup","cancel","status","open","clarify","chitchat","create"]
+                    "enum": ["spawn","followup","cancel","status","open","clarify","chitchat","create","sheets"]
                 ],
                 "agent": [
                     "type": "string",
