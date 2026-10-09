@@ -21,7 +21,7 @@ Genera un token casuale, ad esempio da Terminale:
 openssl rand -hex 32
 ```
 
-Usa lo stesso valore sia nella proprietà script `API_TOKEN) sia nelle impostazioni Jarvis. Non condividere il token.
+Usa lo stesso valore sia nella proprietà script `API_TOKEN` sia nelle impostazioni Jarvis. Non condividere il token.
 
 ## 2. Configura Jarvis
 
@@ -49,7 +49,7 @@ Le richieste riconosciute come operazioni sui fogli vengono instradate a Gemini 
 - Ordinamento di un intervallo.
 - Creazione di una nuova scheda.
 
-Per sicurezza non sono supportate l'eliminazione di schede e la cancellazione di interi documenti. Una singola operazione modifica al massimo 2.000 celle.
+Per sicurezza non sono supportate l'eliminazione di schede e la cancellazione di interi documenti. Una singola operazione modifica al massimo 2.000 celle. Le stringhe che iniziano con `=` sono trattate come testo, a meno che tu non chieda esplicitamente di inserire una formula.
 
 ## Sicurezza e limiti
 
