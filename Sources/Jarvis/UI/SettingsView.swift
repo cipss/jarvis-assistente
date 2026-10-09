@@ -344,7 +344,7 @@ struct GeminiTab: View {
             )
             sheetsStatus = try await bridge.testConnection()
         } catch {
-            sheetsStatus = "Errore Google Sheets: \\(error.localizedDescription)"
+            sheetsStatus = "Errore Google Sheets: \(error.localizedDescription)"
         }
     }
 
