@@ -8,7 +8,7 @@ Parla italiano, con la voce di [Fish Audio](https://fish.audio).
 
 - **Si attiva a voce o con le mani.** Dici «Jarvis» e poi la richiesta, oppure batti due volte le mani e parli. Risponde quando hai finito di parlare. In alternativa tieni premuto ⇧⌘Spazio, parli e rilasci.
 - **Puoi interromperlo.** Se gli parli sopra mentre sta parlando, si ferma e ti ascolta.
-- **Lavora in background.** Gemini interpreta ogni richiesta, decide l'azione e l'agente. Le attività vengono poi eseguite da Claude Code o Codex nella cartella del progetto giusto.
+- **Lavora in background.** Gemini interpreta ogni richiesta e decide l'azione e l'agente. Le attività operative generiche vengono eseguite da Claude Code o Codex; le richieste Google Sheets possono invece usare l'integrazione diretta Gemini + Apps Script senza login dell'agente CLI.
 - **Ti aggiorna mentre lavora**, non solo alla fine: una frase breve ogni tanto su cosa sta facendo.
 - **Ti mostra le sessioni.** In alto a destra vedi le sessioni aperte, con lo stato di ognuna. «Pulisci» toglie quelle finite e azzera la conversazione.
 - **Apre il risultato.** Se una sessione ha costruito una pagina o un sito, Jarvis lo apre da solo.
@@ -52,6 +52,10 @@ Qualche esempio da dire dopo «Jarvis»:
 Esc annulla quello che stai dicendo. ⇧⌘O mostra o nasconde il pannello delle sessioni. Le scorciatoie si cambiano nelle Impostazioni.
 
 **Le richieste che non riguardano un progetto** (mail, calendario, domande) partono da una cartella che scegli in Impostazioni › Comportamento. Conviene indicare la cartella delle tue note, con un `CLAUDE.md` che dice quali strumenti usi. Così Claude Code sa, per esempio, quale casella di posta leggere.
+
+## Google Sheets diretto
+
+Per modificare un foglio Google senza passare da Claude Code o Codex, configura la Web App Apps Script descritta in [integrations/google-sheets/README.md](integrations/google-sheets/README.md). Gemini prepara un piano a partire da una breve anteprima dei dati e Jarvis applica l'operazione tramite l'endpoint configurato. La chiave e il token si impostano in Impostazioni → Cervello.
 
 ## Privacy
 
