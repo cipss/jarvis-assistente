@@ -219,7 +219,6 @@ struct GeminiTab: View {
 
                 TextField("URL Web App Google Apps Script (/exec)", text: $s.settings.googleSheetsEndpoint)
                     .textFieldStyle(.roundedBorder)
-                    .textContentType(.URL)
 
                 HStack(spacing: 8) {
                     SecureField(hasSheetsToken ? "Token configurato" : "Token API_TOKEN", text: $sheetsTokenField)
