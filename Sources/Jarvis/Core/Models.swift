@@ -67,7 +67,7 @@ struct Session: Codable, Identifiable, Hashable, Sendable {
 // MARK: - Orchestrator contract (§4.2)
 
 enum OrchestratorActionKind: String, Codable, Sendable {
-    case spawn, followup, cancel, status, open, clarify, chitchat, create
+    case spawn, followup, cancel, status, open, clarify, chitchat, create, sheets
 }
 
 struct OrchestratorAction: Codable, Sendable, Equatable {
@@ -151,6 +151,8 @@ struct Settings: Codable, Sendable {
     var wakeOnClap: Bool = true
     /// Folder where requests about no project start (mail, calendar, questions). Empty = `<projectsRoot>/general`.
     var generalWorkspace: String = ""
+    /// Web App endpoint for direct Google Sheets edits planned by Gemini.
+    var googleSheetsEndpoint: String = ""
     /// Claude model for coding tasks (building or changing software). Other tasks use the CLI default.
     var codingModel: String = "claude-opus-5-5"
     /// Primary Gemini model used as Jarvis brain/orchestrator.
@@ -200,6 +202,7 @@ struct Settings: Codable, Sendable {
         echoCancellation = try c.decodeIfPresent(Bool.self, forKey: .echoCancellation) ?? d.echoCancellation
         wakeOnClap = try c.decodeIfPresent(Bool.self, forKey: .wakeOnClap) ?? d.wakeOnClap
         generalWorkspace = try c.decodeIfPresent(String.self, forKey: .generalWorkspace) ?? d.generalWorkspace
+        googleSheetsEndpoint = try c.decodeIfPresent(String.self, forKey: .googleSheetsEndpoint) ?? d.googleSheetsEndpoint
         codingModel = try c.decodeIfPresent(String.self, forKey: .codingModel) ?? d.codingModel
         let savedGeminiModel = try c.decodeIfPresent(String.self, forKey: .geminiModel)
         // Migrate the previous Jarvis default to the low-latency voice model.

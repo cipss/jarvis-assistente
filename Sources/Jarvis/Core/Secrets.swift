@@ -12,6 +12,7 @@ enum Secrets {
     static let groqKey = "groq-api-key"
     static let cerebrasKey = "cerebras-api-key"
     static let anthropicKey = "anthropic-api-key"
+    static let googleSheetsToken = "google-sheets-token"
 
     private static let lock = NSLock()
     nonisolated(unsafe) private static var cache: [String: String?] = [:]

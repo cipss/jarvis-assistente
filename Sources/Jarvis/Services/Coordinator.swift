@@ -313,8 +313,30 @@ final class Coordinator {
 
     var geminiConfigured: Bool { Secrets.get(Secrets.geminiKey) != nil }
 
+    nonisolated static func isGoogleSheetsRequest(_ text: String) -> Bool {
+        let value = text.lowercased()
+        let mentionsSheets = [
+            "google sheets", "google sheet", "fogli google", "foglio google",
+            "fogli di google", "foglio di google", "spreadsheet", "spreadsheets",
+            "foglio di calcolo", "fogli di calcolo", "foglio", "fogli", "sheet"
+        ].contains { value.contains($0) }
+        let asksForWork = [
+            "modifica", "aggiorna", "inserisci", "aggiungi", "scrivi", "salva",
+            "compila", "ordina", "cancella", "elimina", "svuota", "sostituisci",
+            "riporta", "registra", "popola", "sposta", "crea", "risultati",
+            "partite", "aggiorna", "leggi", "mostra", "controlla", "cerca"
+        ].contains { value.contains($0) }
+        return mentionsSheets && asksForWork
+    }
+
     func handle(transcript: String) async {
         let geminiKey = Secrets.get(Secrets.geminiKey)
+        let directSheets = Self.isGoogleSheetsRequest(transcript) ||
+            (clarifyContext.map { Self.isGoogleSheetsRequest($0) } ?? false)
+        if directSheets && (geminiKey?.isEmpty ?? true) {
+            showError("Per modificare Google Sheets direttamente serve la chiave Gemini in Impostazioni → Cervello.")
+            return
+        }
         let hasAnyBrain = [geminiKey, Secrets.get(Secrets.groqKey), Secrets.get(Secrets.cerebrasKey), Secrets.get(Secrets.anthropicKey)]
             .contains { $0 != nil && !$0!.isEmpty }
         guard hasAnyBrain else {
@@ -337,6 +359,8 @@ final class Coordinator {
 
     private func handleSerialized(transcript: String, geminiKey: String?, generation: Int) async {
         let gen = generation
+        let directSheets = Self.isGoogleSheetsRequest(transcript) ||
+            (clarifyContext.map { Self.isGoogleSheetsRequest($0) } ?? false)
         let model = settings.settings.geminiModel
         if geminiConversationModel != model {
             geminiInteractionID = nil
@@ -349,8 +373,8 @@ final class Coordinator {
             : "- Conversazione precedente mantenuta da Gemini sul server."
         let gemini = geminiKey.map { GeminiAPI(apiKey: $0, model: model) }
         let brain = FastBrainRouter(
-            mode: settings.settings.brainMode,
-            maxParallel: settings.settings.maxParallelBrains,
+            mode: directSheets ? .geminiOnly : settings.settings.brainMode,
+            maxParallel: directSheets ? 1 : settings.settings.maxParallelBrains,
             gemini: gemini,
             groqKey: Secrets.get(Secrets.groqKey),
             cerebrasKey: Secrets.get(Secrets.cerebrasKey),
@@ -393,9 +417,23 @@ final class Coordinator {
 
         let priorContext = clarifyContext
         clarifyContext = nil
-        AppLog.write("transcript=\"\(transcript)\" → \(action)")
         let finalTranscript = priorContext.map { "\($0) / \(transcript)" } ?? transcript
-        await perform(action, transcript: finalTranscript)
+        let actionToPerform: OrchestratorAction
+        if Self.isGoogleSheetsRequest(finalTranscript) {
+            // A Sheets request is always handled directly: Gemini plans it and the Apps Script bridge applies it.
+            actionToPerform = OrchestratorAction(
+                action: .sheets,
+                agent: nil,
+                project: nil,
+                sessionID: nil,
+                task: finalTranscript,
+                speak: "Controllo il foglio Google e preparo la modifica."
+            )
+        } else {
+            actionToPerform = action
+        }
+        AppLog.write("transcript=\"\(transcript)\" → \(actionToPerform)")
+        await perform(actionToPerform, transcript: finalTranscript)
         // Re-arm the dialogue immediately. TTS still has priority; when it finishes refreshWake enters conversation mode.
         conversationUntil = Date().addingTimeInterval(60)
         refreshWake()
@@ -491,6 +529,40 @@ final class Coordinator {
         case .chitchat:
             if speak.isEmpty, a.remember != nil { speak = "Ok, me lo ricordo." }
             if speak.isEmpty, a.forget != nil { speak = "Fatto, dimenticato." }
+        case .sheets:
+            let task = (a.task ?? transcript).trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !task.isEmpty else {
+                speak = "Che modifica devo fare nel foglio Google?"
+                clarifyContext = transcript
+                pill.state = .clarify
+                break
+            }
+            guard !settings.settings.googleSheetsEndpoint.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                  let token = Secrets.get(Secrets.googleSheetsToken), !token.isEmpty else {
+                speak = "Configura l'URL Web App e il token Google Sheets in Impostazioni → Cervello."
+                break
+            }
+            guard let key = Secrets.get(Secrets.geminiKey), !key.isEmpty else {
+                speak = "Per modificare direttamente Google Sheets serve la chiave Gemini."
+                break
+            }
+            do {
+                let bridge = GoogleSheetsBridge(
+                    endpoint: settings.settings.googleSheetsEndpoint,
+                    token: token,
+                    gemini: GeminiAPI(apiKey: key, model: settings.settings.geminiModel)
+                )
+                let result = try await bridge.execute(task: task)
+                speak = result.message
+                if result.needsClarification {
+                    clarifyContext = task
+                    pill.state = .clarify
+                    pill.secondary = VoiceService.stripCues(result.message)
+                }
+            } catch {
+                AppLog.write("google sheets direct action failed: \(error.localizedDescription)")
+                speak = "Non sono riuscito a completare l'operazione Google Sheets: \(error.localizedDescription)"
+            }
         case .create:
             guard let name = a.project?.trimmingCharacters(in: .whitespaces), !name.isEmpty else {
                 clarifyContext = transcript; pill.state = .clarify; pill.secondary = "Come lo chiamo?"; speak = "Come chiamo il progetto?"; break
