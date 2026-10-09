@@ -40,6 +40,18 @@ Puoi dire, ad esempio:
 
 Le richieste riconosciute come operazioni sui fogli vengono instradate a Gemini soltanto. Se Gemini non sa quale scheda o intervallo usare, Jarvis ti chiede un chiarimento invece di avviare un agente CLI.
 
+## Aggiornamento risultati NHL
+
+Dopo aver installato la versione aggiornata di Jarvis e sostituito il codice Apps Script con il nuovo `Code.gs`, puoi dire:
+
+- «Aggiorna i risultati NHL nel foglio HOCKEY».
+- «Sincronizza le ultime partite NHL concluse».
+- «Inserisci i punteggi NHL aggiornati».
+
+Jarvis recupera i risultati conclusi dall'API pubblica NHL, includendo la data NHL corrente e quella precedente per coprire le partite terminate durante la notte in Italia. Gemini sceglie la mappatura delle colonne osservando le intestazioni reali della scheda `Risultati_Partite_NHL`; Apps Script aggiorna le righe già presenti oppure aggiunge quelle mancanti. L'operazione modifica esclusivamente le celle della data, delle squadre, del punteggio e dell'eventuale ID NHL mappate. Le altre schede e le altre colonne (ad esempio quote e stake) restano intatte.
+
+Per riconoscere il foglio, le intestazioni devono indicare chiaramente data, squadra casa, squadra ospite e punteggio. Sono supportate sia due colonne separate per i gol casa/trasferta sia una sola colonna Risultato/Punteggio. Per evitare duplicati, Jarvis usa l'ID NHL se presente; in caso contrario abbina data e squadre. Se l'app non riesce a riconoscere le intestazioni o l'ordine di un risultato singolo, chiede chiarimenti invece di modificare dati a caso.
+
 ## Operazioni supportate
 
 - Lettura di un'anteprima del documento: prime e ultime righe di ciascuna scheda (max 12 colonne).

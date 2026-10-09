@@ -142,6 +142,114 @@ struct GoogleSheetsBridge: Sendable {
         return ExecutionResult(message: message?.isEmpty == false ? message! : "Modifica Google Sheets completata.", needsClarification: false)
     }
 
+    /// Synchronizes official NHL finals by updating matching rows or appending missing games.
+    /// Gemini selects the sheet-column mapping; Apps Script applies only the mapped score cells.
+    func syncNHLResults(task: String, games: [NHLResultsService.FinalGame]) async throws -> ExecutionResult {
+        let inspectionData = try await post(["action": "inspect", "token": token])
+        let inspection = try object(from: inspectionData)
+        try ensureOK(inspection)
+        let snapshotData = try JSONSerialization.data(withJSONObject: inspection, options: [.prettyPrinted, .sortedKeys])
+        let snapshot = String(data: snapshotData, encoding: .utf8) ?? "{}"
+        let source = try NHLResultsService.sourceContext(for: games)
+
+        let system = """
+        Sei Gemini e devi mappare dati ufficiali NHL alle colonne di un Google Sheet esistente.
+        Non inventare colonne o valori. La scheda di destinazione è obbligatoriamente Risultati_Partite_NHL.
+        Esamina la riga 1 e le righe di esempio per restituire gli indici di colonna a base 1.
+        Mappatura obbligatoria: data della partita, squadra in trasferta, squadra in casa.
+        Per il punteggio, usa entrambe le colonne dedicate away_score e home_score se sono presenti.
+        Se esiste una sola colonna risultato/punteggio, usa score e indica score_order coerente con gli esempi già nel foglio (away-home oppure home-away).
+        Imposta game_id solo se esiste una colonna chiaramente dedicata all'ID della partita NHL. La colonna state/status è facoltativa.
+        Se non riesci a identificare in modo affidabile data, squadre e colonne di punteggio, restituisci operation=clarify con una sola domanda.
+        Restituisci solo JSON conforme allo schema.
+        """
+        let prompt = """
+        Richiesta dell'utente:
+        \(task)
+
+        Anteprima effettiva del documento Google Sheets:
+        \(snapshot)
+
+        \(source)
+
+        Prepara la mappatura delle colonne per la sincronizzazione. Gli indici delle colonne partono da 1.
+        """
+
+        let mappingSchema: [String: Any] = [
+            "type": "object",
+            "additionalProperties": false,
+            "properties": [
+                "date": ["type": "integer", "minimum": 1],
+                "away_team": ["type": "integer", "minimum": 1],
+                "home_team": ["type": "integer", "minimum": 1],
+                "away_score": ["type": "integer", "minimum": 1],
+                "home_score": ["type": "integer", "minimum": 1],
+                "score": ["type": "integer", "minimum": 1],
+                "score_order": ["type": "string", "enum": ["away-home", "home-away"]],
+                "game_id": ["type": "integer", "minimum": 1],
+                "state": ["type": "integer", "minimum": 1]
+            ]
+        ]
+        let schema: [String: Any] = [
+            "type": "object",
+            "additionalProperties": false,
+            "properties": [
+                "operation": ["type": "string", "enum": ["map", "clarify"]],
+                "question": ["type": "string"],
+                "column_map": mappingSchema
+            ],
+            "required": ["operation"]
+        ]
+
+        let planned = try await gemini.generateJSON(
+            systemInstruction: system,
+            prompt: prompt,
+            schema: schema,
+            maxOutputTokens: 1024
+        )
+        guard let plan = try JSONSerialization.jsonObject(with: planned.jsonData) as? [String: Any],
+              let operation = plan["operation"] as? String else {
+            throw BridgeError.invalidResponse("mappatura colonne NHL incompleta")
+        }
+
+        if operation == "clarify" {
+            let question = (plan["question"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+            return ExecutionResult(
+                message: question?.isEmpty == false ? question! : "Non riesco a riconoscere le colonne di data, squadre e punteggio in Risultati_Partite_NHL. Quali colonne devo usare?",
+                needsClarification: true
+            )
+        }
+        guard operation == "map", let columnMap = plan["column_map"] as? [String: Any] else {
+            throw BridgeError.invalidResponse("Gemini non ha restituito la mappatura delle colonne.")
+        }
+
+        let hasScorePair = columnMap["away_score"] is Int && columnMap["home_score"] is Int
+        let hasSingleScore = columnMap["score"] is Int
+        guard columnMap["date"] is Int,
+              columnMap["away_team"] is Int,
+              columnMap["home_team"] is Int,
+              hasScorePair || hasSingleScore else {
+            throw BridgeError.invalidResponse("mancano le colonne obbligatorie per data, squadre e punteggio NHL")
+        }
+
+        let body: [String: Any] = [
+            "action": "sync_nhl_results",
+            "operation": "sync_nhl_results",
+            "token": token,
+            "sheet": "Risultati_Partite_NHL",
+            "column_map": columnMap,
+            "games": games.map(\.dictionary)
+        ]
+        let appliedData = try await post(body)
+        let applied = try object(from: appliedData)
+        try ensureOK(applied)
+        let message = (applied["message"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return ExecutionResult(
+            message: message?.isEmpty == false ? message! : "Risultati NHL sincronizzati.",
+            needsClarification: false
+        )
+    }
+
     private func post(_ body: [String: Any]) async throws -> Data {
         guard let url = URL(string: endpoint.trimmingCharacters(in: .whitespacesAndNewlines)),
               url.scheme?.lowercased() == "https",

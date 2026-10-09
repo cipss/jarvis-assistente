@@ -329,10 +329,25 @@ final class Coordinator {
         return mentionsSheets && asksForWork
     }
 
+    /// NHL result updates use the official scoreboard feed before Gemini prepares the Sheets action.
+    nonisolated static func isNHLResultsUpdateRequest(_ text: String) -> Bool {
+        let value = text.lowercased()
+        let mentionsNHL = [
+            "nhl", "hockey", "risultati_partite_nhl", "risultati partite nhl"
+        ].contains { value.contains($0) }
+        let asksForUpdate = [
+            "aggiorna", "aggiornare", "sincronizza", "sincronizzare", "inserisci",
+            "importa", "scarica", "recupera", "registra", "carica", "risultati",
+            "punteggi", "partite"
+        ].contains { value.contains($0) }
+        return mentionsNHL && asksForUpdate
+    }
+
     func handle(transcript: String) async {
         let geminiKey = Secrets.get(Secrets.geminiKey)
         let directSheets = Self.isGoogleSheetsRequest(transcript) ||
-            (clarifyContext.map { Self.isGoogleSheetsRequest($0) } ?? false)
+            Self.isNHLResultsUpdateRequest(transcript) ||
+            (clarifyContext.map { Self.isGoogleSheetsRequest($0) || Self.isNHLResultsUpdateRequest($0) } ?? false)
         if directSheets && (geminiKey?.isEmpty ?? true) {
             showError("Per modificare Google Sheets direttamente serve la chiave Gemini in Impostazioni → Cervello.")
             return
@@ -360,7 +375,8 @@ final class Coordinator {
     private func handleSerialized(transcript: String, geminiKey: String?, generation: Int) async {
         let gen = generation
         let directSheets = Self.isGoogleSheetsRequest(transcript) ||
-            (clarifyContext.map { Self.isGoogleSheetsRequest($0) } ?? false)
+            Self.isNHLResultsUpdateRequest(transcript) ||
+            (clarifyContext.map { Self.isGoogleSheetsRequest($0) || Self.isNHLResultsUpdateRequest($0) } ?? false)
         let model = settings.settings.geminiModel
         if geminiConversationModel != model {
             geminiInteractionID = nil
@@ -419,7 +435,7 @@ final class Coordinator {
         clarifyContext = nil
         let finalTranscript = priorContext.map { "\($0) / \(transcript)" } ?? transcript
         let actionToPerform: OrchestratorAction
-        if Self.isGoogleSheetsRequest(finalTranscript) {
+        if Self.isGoogleSheetsRequest(finalTranscript) || Self.isNHLResultsUpdateRequest(finalTranscript) {
             // A Sheets request is always handled directly: Gemini plans it and the Apps Script bridge applies it.
             actionToPerform = OrchestratorAction(
                 action: .sheets,
@@ -552,7 +568,17 @@ final class Coordinator {
                     token: token,
                     gemini: GeminiAPI(apiKey: key, model: settings.settings.geminiModel)
                 )
-                let result = try await bridge.execute(task: task)
+                let result: GoogleSheetsBridge.ExecutionResult
+                if Self.isNHLResultsUpdateRequest(task) {
+                    let games = try await NHLResultsService.fetchLatestFinalGames()
+                    if games.isEmpty {
+                        speak = "L'API NHL non segnala partite concluse nelle date più recenti. Non ho modificato il foglio."
+                        break
+                    }
+                    result = try await bridge.syncNHLResults(task: task, games: games)
+                } else {
+                    result = try await bridge.execute(task: task)
+                }
                 speak = result.message
                 if result.needsClarification {
                     clarifyContext = task
