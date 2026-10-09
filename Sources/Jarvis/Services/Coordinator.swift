@@ -318,7 +318,7 @@ final class Coordinator {
         let mentionsSheets = [
             "google sheets", "google sheet", "fogli google", "foglio google",
             "fogli di google", "foglio di google", "spreadsheet", "spreadsheets",
-            "foglio di calcolo", "fogli di calcolo"
+            "foglio di calcolo", "fogli di calcolo", "foglio", "fogli", "sheet"
         ].contains { value.contains($0) }
         let asksForWork = [
             "modifica", "aggiorna", "inserisci", "aggiungi", "scrivi", "salva",
