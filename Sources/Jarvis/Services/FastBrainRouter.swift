@@ -97,7 +97,7 @@ struct FastBrainRouter: Sendable {
 
         let selected = Array(specs.prefix(maxParallel))
 
-        let winner = await withTaskGroup(of: CandidateResult?.self) { group in
+        let winner: CandidateResult? = await withTaskGroup(of: CandidateResult?.self) { group -> CandidateResult? in
             for spec in selected {
                 group.addTask {
                     let t = Date()
